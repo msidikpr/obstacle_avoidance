@@ -12,6 +12,12 @@ from sklearn.cluster import KMeans
 import matplotlib.colors as mcolors
 import glob
 
+
+import sys
+sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/FreelyMovingEphys')
+import warnings
+warnings.filterwarnings('ignore')
+
 from src.base import BaseInput
 from src.topcam import Topcam
 from src.utils.auxiliary import flatten_series, find_index_in_list
@@ -178,9 +184,6 @@ class AvoidanceSession(BaseInput):
         df1 = pd.DataFrame([])
         count =  -1 
         print(num_odd_trials)
-       
-     
-        
         for c in range(num_odd_trials):
             
             # odd
@@ -188,7 +191,12 @@ class AvoidanceSession(BaseInput):
             df1.at[count, 'first_poke'] = self.s['poke1_ts'][c]
             df1.at[count, 'second_poke'] = self.s['poke2_ts'][c]
             time = self.s['top1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
+            vidframes = np.array(list(find_index_in_list(list(self.s['top1_ts']), list(time))))
+            if len(vidframes) == 0:
+                df1.drop(count)
+                continue 
             df1.at[count, 'trial_timestamps'] = time.astype(object)
+            df1.at[count, 'trial_vidframes'] = vidframes[0].astype(object)
             start_stop_inds = (int(np.where([self.s['top1_ts']==time[0]])[1]), int(np.where([self.s['top1_ts']==time[-1]])[1]))
             for pos in list(self.positions['point_loc'].values):
                 df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
@@ -201,9 +209,11 @@ class AvoidanceSession(BaseInput):
                 df1.at[count, 'second_poke'] = self.s['poke1_ts'][c+1]
                 time = self.s['top1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
                 vidframes = np.array(list(find_index_in_list(list(self.s['top1_ts']), list(time))))
-                #df1.at[count, 'recording_timestamps'] = self.s['top1_ts'].astype(object)
+                if len(vidframes) == 0:
+                    df1.drop(count)
+                    continue 
                 df1.at[count, 'trial_timestamps'] = time.astype(object)
-                #df1.at[count, 'trial_vidframes'] = vidframes.astype(object)
+                df1.at[count, 'trial_vidframes'] = vidframes.astype(object)
                 start_stop_inds = (int(np.where([self.s['top1_ts']==time[0]])[1]), int(np.where([self.s['top1_ts']==time[-1]])[1]))
                 for pos in list(self.positions['point_loc'].values):
                     df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
@@ -247,7 +257,7 @@ class AvoidanceSession(BaseInput):
     
     def pillar_avoidance(self):
         self.make_task_df()
-        print('check')
+        
 
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
@@ -278,6 +288,7 @@ class AvoidanceSession(BaseInput):
                 self.data.at[ind, x+'obstacle_y_std'] = np.mean(np.nanstd(yvals, axis=1))
         print('saving' + self.session_name)    
         #print(self.session_path)   
-       
+        time_thresh = self.data['len'].quantile(0.9)
+        self.data = self.data[self.data['len']<time_thresh]
         self.data.to_hdf(os.path.join(self.session_path, (self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         
