@@ -126,7 +126,7 @@ class AvoidanceProcessing(BaseInput):
                     tc.pose_estimation()
                     tc.gather_camera_files()
                     tc.pack_position_data()
-                    tc.pack_video_frames()
+                      tc.pack_video_frames()
                     tc.pt_names = list(tc.xrpts['point_loc'].values)
                     tc.filter_likelihood()
                     tc.get_head_body_yaw()
@@ -288,7 +288,31 @@ class AvoidanceSession(BaseInput):
                 self.data.at[ind, x+'obstacle_y_std'] = np.mean(np.nanstd(yvals, axis=1))
         print('saving' + self.session_name)    
         #print(self.session_path)   
+        # drop any transits that were really slow (only drop slowest 10% of transits)
         time_thresh = self.data['len'].quantile(0.9)
         self.data = self.data[self.data['len']<time_thresh]
-        self.data.to_hdf(os.path.join(self.session_path, (self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        
+        self.raw_data =  self.data
+        self.processed_data =  self.data.drop(columns = ['nose_x', 'nose_y', 'nose_likelihood', 'leftear_x', 'leftear_y',
+       'leftear_likelihood', 'rightear_x', 'rightear_y',
+       'rightear_likelihood', 'spine_x', 'spine_y', 'spine_likelihood',
+       'midspine_x', 'midspine_y', 'midspine_likelihood', 'tailbase_x',
+       'tailbase_y', 'tailbase_likelihood', 'midtail_x', 'midtail_y',
+       'midtail_likelihood', 'tailend_x', 'tailend_y',
+       'tailend_likelihood', 'arenaTL_x', 'arenaTL_y',
+       'arenaTL_likelihood', 'arenaTR_x', 'arenaTR_y',
+       'arenaTR_likelihood', 'arenaBL_x', 'arenaBL_y',
+       'arenaBL_likelihood', 'arenaBR_x', 'arenaBR_y',
+       'arenaBR_likelihood', 'obstaclewTL_x', 'obstaclewTL_y',
+       'obstaclewTL_likelihood', 'obstaclewTR_x', 'obstaclewTR_y',
+       'obstaclewTR_likelihood', 'obstaclewBR_x', 'obstaclewBR_y',
+       'obstaclewBR_likelihood', 'obstaclewBL_x', 'obstaclewBL_y',
+       'obstaclewBL_likelihood', 'obstaclebTL_x', 'obstaclebTL_y',
+       'obstaclebTL_likelihood', 'obstaclebTR_x', 'obstaclebTR_y',
+       'obstaclebTR_likelihood', 'obstaclebBR_x', 'obstaclebBR_y',
+       'obstaclebBR_likelihood', 'obstaclebBL_x', 'obstaclebBL_y',
+       'obstaclebBL_likelihood', 'leftportT_x', 'leftportT_y',
+       'leftportT_likelihood', 'leftportB_x', 'leftportB_y',
+       'leftportB_likelihood', 'rightportT_x', 'rightportT_y',
+       'rightportT_likelihood', 'rightportB_x', 'rightportB_y'])
+        self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_',self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.processed_data.to_hdf(os.path.join(self.session_path,('processed_',self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
