@@ -126,7 +126,7 @@ class AvoidanceProcessing(BaseInput):
                     tc.pose_estimation()
                     tc.gather_camera_files()
                     tc.pack_position_data()
-                      tc.pack_video_frames()
+                    tc.pack_video_frames()
                     tc.pt_names = list(tc.xrpts['point_loc'].values)
                     tc.filter_likelihood()
                     tc.get_head_body_yaw()
@@ -286,7 +286,7 @@ class AvoidanceSession(BaseInput):
                 self.data.at[ind, x+'obstacle_y'] = np.nanmean(yvals)
                 self.data.at[ind, x+'obstacle_y_cm'] = np.nanmean(yvals_cm)
                 self.data.at[ind, x+'obstacle_y_std'] = np.mean(np.nanstd(yvals, axis=1))
-        print('saving' + self.session_name)    
+           
         #print(self.session_path)   
         # drop any transits that were really slow (only drop slowest 10% of transits)
         time_thresh = self.data['len'].quantile(0.9)
@@ -314,5 +314,7 @@ class AvoidanceSession(BaseInput):
        'leftportT_likelihood', 'leftportB_x', 'leftportB_y',
        'leftportB_likelihood', 'rightportT_x', 'rightportT_y',
        'rightportT_likelihood', 'rightportB_x', 'rightportB_y'])
-        self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_',self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        self.processed_data.to_hdf(os.path.join(self.session_path,('processed_',self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        print('saving' + self.session_name + 'raw')
+        self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        print('saving' + self.session_name + ' processed')
+        self.processed_data.to_hdf(os.path.join(self.session_path,('processed_' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
