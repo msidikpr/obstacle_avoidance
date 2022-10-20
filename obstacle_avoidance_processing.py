@@ -129,8 +129,8 @@ class AvoidanceProcessing(BaseInput):
                     tc.pack_video_frames()
                     tc.pt_names = list(tc.xrpts['point_loc'].values)
                     tc.filter_likelihood()
-                    tc.get_head_body_yaw()
-                    tc.save_params()    
+                    #tc.get_head_body_yaw()
+                    #tc.save_params()    
 ## process each session
     def process(self, videos=False):
         self.gather_all_sessions()
@@ -163,7 +163,7 @@ class AvoidanceSession(BaseInput):
     def __init__(self, s_input, path_input, metadata_input):
         self.s = s_input # series from dataframe of all trials
         self.likelihood_thresh = 0.99
-        self.dist_across_arena = 30.48 # cm between bottom-right and bottom-left pillar
+        self.dist_across_arena = 48.26 # cm between bottom-right and bottom-left pillar
         self.path = path_input
         self.camname = 'top1'
         self.shared_metadata = metadata_input
@@ -220,8 +220,11 @@ class AvoidanceSession(BaseInput):
                 df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
                
         df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task']
+
         print('df made')
         self.data = df1
+        #self.data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
         
 
         
