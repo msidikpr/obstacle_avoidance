@@ -262,7 +262,6 @@ class AvoidanceSession(BaseInput):
         self.make_task_df()
         
 
-
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
         self.data['odd'] = np.nan
         for i, ind in enumerate(self.data.index.values):
@@ -275,48 +274,42 @@ class AvoidanceSession(BaseInput):
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
 
-
-        # get obstacle position for all times
+        ## take median of arena points
+        arena_cols = [col for col in self.data.columns if 'arena' in col]
+        arena_cols =[col for col in arena_cols if 'likelihood' not in col]
+        for col in arena_cols:
+            for ind,row in self.data.iterrows():
+                self.data.at[ind,col] = np.nanmedian(row[col])
+        ## take last index of obstacle postiton within trial
+        obstacle_cols = [col for col in self.data.columns if 'obstacle' in col]
+        obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
+        obstacle_cols = [col for col in obstacle_cols if 'std' not in col]
+        for col in obstacle_cols:
+            for ind,row in self.data.iterrows():
+                self.data.at[ind,col+'_lind'] = row[col][np.isfinite(row[col].astype(float))][-1]
+        ## obstacle center based on last index
+        index = '_lind'
         for ind, row in self.data.iterrows():
-            for x in ['b','w']:
-                xvals = np.stack([row['obstacle'+x+'TL_x_cm'], row['obstacle'+x+'TR_x_cm'], row['obstacle'+x+'BL_x_cm'], row['obstacle'+x+'BR_x_cm']]).astype(float)
-                xvals_cm = np.stack([row['obstacle'+x+'TL_x_cm'], row['obstacle'+x+'TR_x_cm'], row['obstacle'+x+'BL_x_cm'], row['obstacle'+x+'BR_x_cm']]).astype(float)
-                self.data.at[ind, x+'obstacle_x'] = np.nanmean(xvals)
-                self.data.at[ind, x+'obstacle_x_cm'] = np.nanmean(xvals_cm)
-                self.data.at[ind, x+'obstacle_x_std'] = np.mean(np.nanstd(xvals, axis=1))
-                yvals = np.stack([row['obstaclewTL_y_cm'], row['obstaclewTR_y_cm'], row['obstaclewBL_y_cm'], row['obstaclewBR_y_cm']]).astype(float)
-                yvals_cm = np.stack([row['obstaclewTL_y_cm'], row['obstaclewTR_y_cm'], row['obstaclewBL_y_cm'], row['obstaclewBR_y_cm']]).astype(float)
-                self.data.at[ind, x+'obstacle_y'] = np.nanmean(yvals)
-                self.data.at[ind, x+'obstacle_y_cm'] = np.nanmean(yvals_cm)
-                self.data.at[ind, x+'obstacle_y_std'] = np.mean(np.nanstd(yvals, axis=1))
+            xvals = np.stack([row['obstacleTL_x'+ index], row['obstacleTR_x'+ index], row['obstacleBL_x'+ index], row['obstacleBR_x'+ index]]).astype(float)
+            xvals_cm = np.stack([row['obstacleTL_x_cm'+ index], row['obstacleTR_x_cm'+ index], row['obstacleBL_x_cm'+ index], row['obstacleBR_x_cm'+ index]]).astype(float)
+            self.data.at[ind,'obstacle_x'+ index] = np.nanmean(xvals)
+            self.data.at[ind,'obstacle_x_cm'+ index] = np.nanmean(xvals_cm) 
+
+            yvals = np.stack([row['obstacleTL_y'+ index], row['obstacleTR_y'+ index], row['obstacleBL_y'+ index], row['obstacleBR_y'+ index]]).astype(float)
+            yvals_cm = np.stack([row['obstacleTL_y_cm'+ index], row['obstacleTR_y_cm'+ index], row['obstacleBL_y_cm'+ index], row['obstacleBR_y_cm'+ index]]).astype(float)
+            self.data.at[ind,'obstacle_y'+ index] = np.nanmean(yvals)
+            self.data.at[ind,'obstacle_y_cm'+ index] = np.nanmean(yvals_cm)
+         
+
+
+
            
         #print(self.session_path)   
         # drop any transits that were really slow (only drop slowest 10% of transits)
         time_thresh = self.data['len'].quantile(0.9)
         self.data = self.data[self.data['len']<time_thresh]
         self.raw_data =  self.data
-        self.processed_data =  self.data.drop(columns = ['nose_x', 'nose_y', 'nose_likelihood', 'leftear_x', 'leftear_y',
-       'leftear_likelihood', 'rightear_x', 'rightear_y',
-       'rightear_likelihood', 'spine_x', 'spine_y', 'spine_likelihood',
-       'midspine_x', 'midspine_y', 'midspine_likelihood', 'tailbase_x',
-       'tailbase_y', 'tailbase_likelihood', 'midtail_x', 'midtail_y',
-       'midtail_likelihood', 'tailend_x', 'tailend_y',
-       'tailend_likelihood', 'arenaTL_x', 'arenaTL_y',
-       'arenaTL_likelihood', 'arenaTR_x', 'arenaTR_y',
-       'arenaTR_likelihood', 'arenaBL_x', 'arenaBL_y',
-       'arenaBL_likelihood', 'arenaBR_x', 'arenaBR_y',
-       'arenaBR_likelihood', 'obstaclewTL_x', 'obstaclewTL_y',
-       'obstaclewTL_likelihood', 'obstaclewTR_x', 'obstaclewTR_y',
-       'obstaclewTR_likelihood', 'obstaclewBR_x', 'obstaclewBR_y',
-       'obstaclewBR_likelihood', 'obstaclewBL_x', 'obstaclewBL_y',
-       'obstaclewBL_likelihood', 'obstaclebTL_x', 'obstaclebTL_y',
-       'obstaclebTL_likelihood', 'obstaclebTR_x', 'obstaclebTR_y',
-       'obstaclebTR_likelihood', 'obstaclebBR_x', 'obstaclebBR_y',
-       'obstaclebBR_likelihood', 'obstaclebBL_x', 'obstaclebBL_y',
-       'obstaclebBL_likelihood', 'leftportT_x', 'leftportT_y',
-       'leftportT_likelihood', 'leftportB_x', 'leftportB_y',
-       'leftportB_likelihood', 'rightportT_x', 'rightportT_y',
-       'rightportT_likelihood', 'rightportB_x', 'rightportB_y'])
+        self.processed_data =  self.data.drop(self.data.filter(regex='likelihood').columns,axis = 1)
         print('saving' + self.session_name + 'raw')
         self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('saving' + self.session_name + ' processed')
