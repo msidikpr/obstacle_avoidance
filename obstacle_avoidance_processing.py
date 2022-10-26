@@ -11,6 +11,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.cluster import KMeans
 import matplotlib.colors as mcolors
 import glob
+import h5py
 
 
 import sys
@@ -170,6 +171,7 @@ class AvoidanceSession(BaseInput):
 
         #self.num_clusters_to_use = self.shared_metadata[self.s['date']][self.s['animal']][str(self.s['task'])]['num_positions']
         self.session_path = os.path.join(*[self.path, str(self.s['date']), str(self.s['animal']),str(self.s['task'])])
+        self.vidpath = find('*'+str(self.s['date'])+'*'+self.s['animal']+'*'+str(self.s['task'])+'*.avi', self.session_path)[0]
 
         self.generic_camconfig = {
             'internals': {
@@ -225,7 +227,29 @@ class AvoidanceSession(BaseInput):
         self.data = df1
         #self.data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
-        
+    ## format frames 
+    def format_frames_oa(self):
+        #open avi file
+        print(self.vidpath)
+        vidread = cv2.VideoCapture(self.vidpath)
+        # empty array that is the target shape
+        # should be number of frames x downsampled height x downsampled width
+        all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
+                            int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                            int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH))], dtype=np.uint8)
+        # iterate through each frame
+        for frame_num in tqdm(range(0,int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)))):
+            # read the frame in and make sure it is read in correctly
+            ret, frame = vidread.read()
+            if not ret:
+                break
+            # convert to grayyscale
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # add the downsampled frame to all_frames as int8
+            all_frames[frame_num,:,:] = frame.astype(np.int8)
+            self.video_frames = all_frames
+        print('saved_frames')
+
 
         
     def add_tracking(self, name, path):
@@ -260,6 +284,7 @@ class AvoidanceSession(BaseInput):
     
     def pillar_avoidance(self):
         self.make_task_df()
+        self.format_frames_oa()
         
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
@@ -299,6 +324,13 @@ class AvoidanceSession(BaseInput):
             yvals_cm = np.stack([row['obstacleTL_y_cm'+ index], row['obstacleTR_y_cm'+ index], row['obstacleBL_y_cm'+ index], row['obstacleBR_y_cm'+ index]]).astype(float)
             self.data.at[ind,'obstacle_y'+ index] = np.nanmean(yvals)
             self.data.at[ind,'obstacle_y_cm'+ index] = np.nanmean(yvals_cm)
+        
+        ## pack frames of each trial
+        session_frames = self.video_frames
+        f = h5py.File(os.path.join(self.session_path, ('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5'), 'w')
+        f.create_dataset(os.path.join(self.session_path, ('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0]), data=session_frames)
+
+
          
 
 
