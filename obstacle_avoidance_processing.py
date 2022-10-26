@@ -327,10 +327,8 @@ class AvoidanceSession(BaseInput):
         
         ## pack frames of each trial
         session_frames = self.video_frames
-        f = h5py.File(os.path.join(self.session_path, ('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5'), 'w')
-        f.create_dataset(os.path.join(self.session_path, ('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0]), data=session_frames)
-
-
+        f = h5py.File(os.path.join(self.session_path, ('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')),'w')
+        f.create_dataset(os.path.join(self.session_path,('frames_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0]))),data=session_frames)
          
 
 
