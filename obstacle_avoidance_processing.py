@@ -15,7 +15,7 @@ import h5py
 
 
 import sys
-sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/FreelyMovingEphys')
+sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -125,11 +125,11 @@ class AvoidanceProcessing(BaseInput):
                     name = '_'.join(os.path.splitext(os.path.split([i for i in find('*.avi', recording_dir) if all(bad not in i for bad in ['plot','IR','rep11','betafpv','side_gaze','._'])][0])[1])[0].split('_')[:-2])
                     tc = Topcam(config=camconfig, recording_name=name, recording_path=recording_dir, camname=self.camname)
                     tc.pose_estimation()
-                    tc.gather_camera_files()
-                    tc.pack_position_data()
-                    tc.pack_video_frames()
-                    tc.pt_names = list(tc.xrpts['point_loc'].values)
-                    tc.filter_likelihood()
+                    #tc.gather_camera_files()
+                    #tc.pack_position_data()
+                    #tc.pack_video_frames()
+                    #tc.pt_names = list(tc.xrpts['point_loc'].values)
+                    #tc.filter_likelihood()
                     #tc.get_head_body_yaw()
                     #tc.save_params()    
 ## process each session
@@ -258,7 +258,9 @@ class AvoidanceSession(BaseInput):
         tc.gather_camera_files()
         tc.pack_position_data()
         tc.filter_likelihood()
+        tc.pack_video_frames()
         self.positions = tc.xrpts
+        self.frames = tc.xrframes
         self.session_name = name
         self.session_path = path
 
@@ -284,7 +286,7 @@ class AvoidanceSession(BaseInput):
     
     def pillar_avoidance(self):
         self.make_task_df()
-        self.format_frames_oa()
+        #self.format_frames_oa()
         
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)

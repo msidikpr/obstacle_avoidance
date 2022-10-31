@@ -461,13 +461,13 @@ class Camera(BaseInput):
         vidread = cv2.VideoCapture(self.video_path)
         # empty array that is the target shape
         # should be number of frames x downsampled height x downsampled width
-       # all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
-                            #int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)*dwnsmpl),
-                            #int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH)*dwnsmpl)], dtype=np.uint8)
+       all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
+                            int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)*dwnsmpl),
+                            int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH)*dwnsmpl)], dtype=np.uint8)
         
-        all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
-                            int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-                            int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH))], dtype=np.uint8)
+        #all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
+                            #int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                            #int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH))], dtype=np.uint8)
 
         
         # iterate through each frame
@@ -480,9 +480,9 @@ class Camera(BaseInput):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             ## took out downsampled frames in dylans code mike 10/19/22
             # downsample the frame by an amount specified in the config file
-            #sframe = cv2.resize(frame, (0,0), fx=dwnsmpl, fy=dwnsmpl, interpolation=cv2.INTER_NEAREST)
+            sframe = cv2.resize(frame, (0,0), fx=dwnsmpl, fy=dwnsmpl, interpolation=cv2.INTER_NEAREST)
             # add the downsampled frame to all_frames as int8
-            #all_frames[frame_num,:,:] = sframe.astype(np.int8)
+            all_frames[frame_num,:,:] = sframe.astype(np.int8)
         if not usexr:
             return all_frames
         # store the combined video frames in an xarray
