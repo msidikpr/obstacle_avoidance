@@ -461,7 +461,7 @@ class Camera(BaseInput):
         vidread = cv2.VideoCapture(self.video_path)
         # empty array that is the target shape
         # should be number of frames x downsampled height x downsampled width
-       all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
+        all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
                             int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)*dwnsmpl),
                             int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH)*dwnsmpl)], dtype=np.uint8)
         
