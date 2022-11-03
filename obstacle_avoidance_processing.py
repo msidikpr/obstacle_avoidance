@@ -23,6 +23,7 @@ from src.base import BaseInput
 from src.topcam import Topcam
 from src.utils.auxiliary import flatten_series, find_index_in_list
 from src.utils.path import find
+from base_functions import format_frames,flatten_column,list_columns
 
 
 ## create avoidance session object 
@@ -307,25 +308,85 @@ class AvoidanceSession(BaseInput):
         for col in arena_cols:
             for ind,row in self.data.iterrows():
                 self.data.at[ind,col] = np.nanmedian(row[col])
-        ## take last index of obstacle postiton within trial
-        obstacle_cols = [col for col in self.data.columns if 'obstacle' in col]
-        obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
-        obstacle_cols = [col for col in obstacle_cols if 'std' not in col]
-        for col in obstacle_cols:
-            for ind,row in self.data.iterrows():
-                self.data.at[ind,col+'_lind'] = row[col][np.isfinite(row[col].astype(float))][-1]
-        ## obstacle center based on last index
-        index = '_lind'
-        for ind, row in self.data.iterrows():
-            xvals = np.stack([row['obstacleTL_x'+ index], row['obstacleTR_x'+ index], row['obstacleBL_x'+ index], row['obstacleBR_x'+ index]]).astype(float)
-            xvals_cm = np.stack([row['obstacleTL_x_cm'+ index], row['obstacleTR_x_cm'+ index], row['obstacleBL_x_cm'+ index], row['obstacleBR_x_cm'+ index]]).astype(float)
-            self.data.at[ind,'obstacle_x'+ index] = np.nanmean(xvals)
-            self.data.at[ind,'obstacle_x_cm'+ index] = np.nanmean(xvals_cm) 
+        ## interpolated traces of body parts
+        keys = ['nose','leftear','rightear','spine','midspine']
+        fake_time = np.linspace(0,1,200)
+        box_sz = 5 
+        box = np.ones(box_sz)/box_sz
 
-            yvals = np.stack([row['obstacleTL_y'+ index], row['obstacleTR_y'+ index], row['obstacleBL_y'+ index], row['obstacleBR_y'+ index]]).astype(float)
-            yvals_cm = np.stack([row['obstacleTL_y_cm'+ index], row['obstacleTR_y_cm'+ index], row['obstacleBL_y_cm'+ index], row['obstacleBR_y_cm'+ index]]).astype(float)
-            self.data.at[ind,'obstacle_y'+ index] = np.nanmean(yvals)
-            self.data.at[ind,'obstacle_y_cm'+ index] = np.nanmean(yvals_cm)
+        count = 0
+        for ind, row in self.data.iterrows():
+            for key in keys:
+                xT = np.linspace(0,1,len(row[key + '_x'])); yT = np.linspace(0,1,len(row[key + '_y']))
+                intx = interp1d(xT, row[key + '_x_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
+                inty = interp1d(yT, row[key + '_y_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
+                fillx = pd.Series(intx).fillna(method='bfill').to_numpy()
+                filly = pd.Series(inty).fillna(method='bfill').to_numpy()
+
+                count += 1
+                self.data.at[ind,'interp_' + key+ '_y_cm'] = filly.astype(object)
+                self.data.at[ind,'interp_' + key+ '_x_cm'] = fillx.astype(object)
+        ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion
+
+        # get list of columns need for re indexing
+        keys = ['nose','leftear','rightear','spine','midspine','obstacle']
+        keys_list = list_columns(self.data,keys)
+        keys_list= [col for col in keys_list if 'likelihood' not in col]
+        keys_list= [col for col in keys_list if 'lind' not in col]
+
+        # check if odd or even trial
+        #  get first index when nose crosses a distance thresh hold
+        ##odd tiral at 16 cm even at 56 cm     
+        for ind, row in self.data.iterrows(): 
+            if row['odd'] == True:
+                nose_list = row['nose_x_cm'] 
+                odd_ind = np.argmax(nose_list>16)
+                for key in keys_list:
+                    self.data.at[ind,'gt_' + key] = row[key][odd_ind:]
+                #use odd_ind to index into obstacle 
+                # iterate over columns list  
+
+                #create gt_obstacle points
+            else: 
+                nose_list = row['nose_x_cm']
+                even_ind = np.argmax(nose_list<56)
+                for key in keys_list:
+                    self.data.at[ind,'gt_' + key] = row[key][even_ind:]
+        ##  median point at gt obstacle 
+        obstacle_cols = list_columns(df,['obstacle'])
+        obstacle_cols = [col for col in obstacle_cols if 'gt_' in col]
+        for ind, row in self.data.iterrows():
+            # calculate median of each corner
+            for col in obstacle_cols:
+                self.data.at[ind,'median_'+ col]= np.nanmedian(row[col])
+
+
+
+        
+
+
+
+
+
+        ### take last index of obstacle postiton within trial
+        #obstacle_cols = [col for col in self.data.columns if 'obstacle' in col]
+        #obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
+        #obstacle_cols = [col for col in obstacle_cols if 'std' not in col]
+        #for col in obstacle_cols:
+        #    for ind,row in self.data.iterrows():
+        #        self.data.at[ind,col+'_lind'] = row[col][np.isfinite(row[col].astype(float))][-1]
+        ### obstacle center based on last index
+        #index = '_lind'
+        #for ind, row in self.data.iterrows():
+        #    xvals = np.stack([row['obstacleTL_x'+ index], row['obstacleTR_x'+ index], row['obstacleBL_x'+ index], row['obstacleBR_x'+ index]]).astype(float)
+        #    xvals_cm = np.stack([row['obstacleTL_x_cm'+ index], row['obstacleTR_x_cm'+ index], row['obstacleBL_x_cm'+ index], row['obstacleBR_x_cm'+ index]]).astype(float)
+        #    self.data.at[ind,'obstacle_x'+ index] = np.nanmean(xvals)
+        #    self.data.at[ind,'obstacle_x_cm'+ index] = np.nanmean(xvals_cm) 
+#
+        #    yvals = np.stack([row['obstacleTL_y'+ index], row['obstacleTR_y'+ index], row['obstacleBL_y'+ index], row['obstacleBR_y'+ index]]).astype(float)
+        #    yvals_cm = np.stack([row['obstacleTL_y_cm'+ index], row['obstacleTR_y_cm'+ index], row['obstacleBL_y_cm'+ index], row['obstacleBR_y_cm'+ index]]).astype(float)
+        #    self.data.at[ind,'obstacle_y'+ index] = np.nanmean(yvals)
+        #    self.data.at[ind,'obstacle_y_cm'+ index] = np.nanmean(yvals_cm)
         
         ## pack frames of each trial
         #session_frames = self.video_frames

@@ -1,6 +1,7 @@
 import os, subprocess, math, cv2
 import numpy as np
 import pandas as pd
+import itertools 
 
 
 
@@ -25,3 +26,30 @@ def format_frames(vid_path):
         # add the downsampled frame to all_frames as int8
         all_frames[frame_num,:,:] = frame.astype(np.int8)  
     return all_frames
+
+
+
+## make serries from multiple objects from df column 
+def flatten_column(df,column):
+  column_list = []
+  for ind, row in df.iterrows(): 
+    #pts=
+    series = row[column]
+    column_list.append(series)
+  column_list = list(itertools.chain(*column_list))
+  column_list = np.array(column_list)
+  return column_list
+
+
+##create list of columns from df based on list of keys 
+#keys as [] exp ['nose','leftear','rightear','spine','midspine']
+def list_columns(df,keys): 
+  columns_list = []
+  for key in keys:
+    columns = [col for col in df.columns if key in col]
+    columns_list.append(columns)
+  columns_list = list(itertools.chain(*columns_list))
+  columns_list = np.array(columns_list)
+
+
+  return columns_list
