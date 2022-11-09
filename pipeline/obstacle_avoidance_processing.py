@@ -228,7 +228,7 @@ class AvoidanceSession(BaseInput):
 
         print('df made')
         self.data = df1
-        #self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
     ## format frames 
     def format_frames_oa(self):
@@ -313,7 +313,7 @@ class AvoidanceSession(BaseInput):
         arena_cols =[col for col in arena_cols if 'likelihood' not in col]
         for col in arena_cols:
             for ind,row in self.data.iterrows():
-                self.data.at[ind,col] = np.nanmedian(row[col])
+                self.data.at[ind,col] = np.mean(row[col])
         print('arena_median')
         ## interpolated traces of body parts
         keys = ['nose','leftear','rightear','spine','midspine']
@@ -337,20 +337,21 @@ class AvoidanceSession(BaseInput):
         ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion
 
         # get list of columns need for re indexing
-        keys = ['nose','leftear','rightear','spine','midspine','obstacle']
+        keys = ['nose','leftear','rightear','spine','midspine']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
         keys_list= [col for col in keys_list if 'lind' not in col]
 
         # check if odd or even trial
         #  get first index when nose crosses a distance thresh hold
+        #trail start = ts
         ##odd tiral at 16 cm even at 56 cm     
         for ind, row in self.data.iterrows(): 
             if row['odd'] == True:
                 nose_list = row['nose_x_cm'] 
                 odd_ind = np.argmax(nose_list>16)
                 for key in keys_list:
-                    self.data.at[ind,'gt_' + key] = row[key][odd_ind:]
+                    self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
                 # iterate over columns list  
 
@@ -359,25 +360,29 @@ class AvoidanceSession(BaseInput):
                 nose_list = row['nose_x_cm']
                 even_ind = np.argmax(nose_list<56)
                 for key in keys_list:
-                    self.data.at[ind,'gt_' + key] = row[key][even_ind:]
+                    self.data.at[ind,'ts_' + key] = row[key][even_ind:]
+
         ##  median point at gt obstacle 
         obstacle_cols = list_columns(self.data,['obstacle'])
-        obstacle_cols = [col for col in obstacle_cols if 'gt_' in col]
+        obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
         for ind, row in self.data.iterrows():
+            nose_list = row['nose_x_cm']
+            middle_time = np.where((nose_list > 30) & (nose_list < 50))
+            first,last = [middle_time[0][i] for i in (0, -1)] 
             # calculate median of each corner
             for col in obstacle_cols:
-                self.data.at[ind,'median_'+ col]= np.nanmedian(row[col])
+                self.data.at[ind,'gt_'+ col]= np.nanmedian(row[col][first:last])
         for ind, row in self.data.iterrows():
   
             xvals = np.stack([row['gt_obstacleTL_x'], row['gt_obstacleTR_x'], row['gt_obstacleBL_x'], row['gt_obstacleBR_x']])
             xvals_cm = np.stack([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBL_x_cm'], row['gt_obstacleBR_x_cm']])
-            self.data.at[ind,'gt_obstacle_cen_x' ] = np.nanmedian(xvals)
-            self.data.at[ind,'gt_obstacle_cen_x_cm' ] = np.nanmedian(xvals_cm)
+            self.data.at[ind,'gt_obstacle_cen_x' ] = np.mean(xvals)
+            self.data.at[ind,'gt_obstacle_cen_x_cm' ] = np.mean(xvals_cm)
 
             yvals = np.stack([row['gt_obstacleTL_y'], row['gt_obstacleTR_y'], row['gt_obstacleBL_y'], row['gt_obstacleBR_y']])
             yvals_cm = np.stack([row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBL_y_cm'], row['gt_obstacleBR_y_cm']])
-            self.data.at[ind,'gt_obstacle_cen_y' ] = np.nanmedian(yvals)
-            self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.nanmedian(yvals_cm)
+            self.data.at[ind,'gt_obstacle_cen_y' ] = np.mean(yvals)
+            self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.mean(yvals_cm)
 
 
         # drop any transits that were really slow (only drop slowest 10% of transits)
