@@ -57,3 +57,45 @@ def list_columns(df,keys):
 
 
   return columns_list
+
+def intersect(p1, p2, p3, p4):
+    x1,y1 = p1
+    x2,y2 = p2
+    x3,y3 = p3
+    x4,y4 = p4
+    denom = (y4-y3)*(x2-x1) - (x4-x3)*(y2-y1)
+    if denom == 0: # parallel
+        x,y = 0,0
+        return (x,y)
+    ua = ((x4-x3)*(y1-y3) - (y4-y3)*(x1-x3)) / denom
+    if ua < 0 or ua > 1: # out of range
+        x,y = 0,0
+
+        
+
+
+        return (x,y)
+    ub = ((x2-x1)*(y1-y3) - (y2-y1)*(x1-x3)) / denom
+    if ub < 0 or ub > 1: # out of range
+        x,y = 0,0
+        return (x,y)
+    x = x1 + ua * (x2-x1)
+    y = y1 + ua * (y2-y1)
+    return (x,y)
+
+
+
+
+
+def nearestX_roundup(num, x):
+  d = num // x 
+  a = d * x
+  b = a + x
+
+  if (num/x).is_integer() == True:
+    return num
+  else:  
+    return b
+
+def midpoint(x1, y1, x2, y2):
+    return ((x1 + x2)/2, (y1 + y2)/2)
