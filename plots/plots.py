@@ -245,15 +245,42 @@ class plot_oa(BaseInput):
              edge_mid = midpoint(obstacle_top[0],obstacle_top[1],obstacle_bottom[0],obstacle_bottom[1])
              self.df.at[ind,'obstacle_edge_mid_x_cm'] = edge_mid[0]
              self.df.at[ind,'obstacle_edge_mid_y_cm'] = edge_mid[1]
+    
+    ## 
+    def get_intersect_counts_bins(self):
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            for ind,row in animal_frame.iterrows():
+                row_weights = np.ones_like(row['obstacle_intersect_nose_y'])/float(len(row['obstacle_intersect_nose_y']))
+                counts,bins=np.histogram((row['obstacle_intersect_nose_y'] -  row['obstacle_edge_mid_y_cm']),range=(-15,15),bins = 10 ,weights=row_weights)
+                self.df.at[ind,'normalized_counts_intersect_nose_y'] = counts.astype('object')
+                self.df.at[ind,'sum_normalized_counts_intersect_nose_y'] = float(sum(counts))
+                self.df.at[ind,'bins_intersect_nose_y'] = bins.astype('object')
+    
+    def get_intersect_mean_counts(self):
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            by_cluster =  animal_frame.groupby(['cluster_label'])
+            for cluster,cluster_frame in by_cluster:
+                by_direction = cluster_frame.groupby(['odd'])
+                for direcetion,direction_frame in by_direction:
+                    mean_hist = np.mean(direction_frame['normalized_counts_intersect_nose_y'])
+                    for ind,row in direction_frame.iterrows():
+                        self.df.at[ind,'mean_normalized_counts_intersect_nose_y']=mean_hist.astype('object')
+        
+
+
 
 
     def process_df(self):
         self.cluster()
-        self.get_body_angle()
+        #self.get_body_angle()
         self.get_head_angle()
         self.get_midpoint_edge()
-        self.get_obstacle_intersect_body()
+        #self.get_obstacle_intersect_body()
         self.get_obstacle_intersect_nose()
+        self.get_intersect_counts_bins()
+        self.get_intersect_mean_counts()
         
 
          

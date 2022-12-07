@@ -932,6 +932,7 @@ class AvoidanceSession(BaseInput):
         for trial_ind, trial_row in tqdm(self.all_sessions.iterrows()):
             try:
                 # analyze each trial
+                #print(trial_row['animal'])
                 trial = AvoidanceTrial(trial_row, self.path, self.metadata)
                 dlc_h5 = find('*'+str(trial_row['date'])+'*'+trial_row['animal']+'*'+str(trial_row['task'])+'*.h5', self.path)
                 if dlc_h5 == []:

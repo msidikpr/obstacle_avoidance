@@ -141,8 +141,9 @@ class AvoidanceProcessing(BaseInput):
             try:
                 # analyze each trial
                 trial = AvoidanceSession(trial_row, self.path, self.metadata)
-                print(trial_row['animal'])
-                dlc_h5 = find('*'+str(trial_row['date'])+'*'+trial_row['animal']+'*'+str(trial_row['task'])+'*.h5', self.path)
+
+            
+                dlc_h5 = find('*'+str(trial_row['date'])+'*'+str(trial_row['animal'])+'*'+str(trial_row['task'])+'*.h5', self.path)
                 
                 if dlc_h5 == []:
                     continue
@@ -228,7 +229,7 @@ class AvoidanceSession(BaseInput):
 
         print('df made')
         self.data = df1
-        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        
 
     ## format frames 
     def format_frames_oa(self):
@@ -290,23 +291,26 @@ class AvoidanceSession(BaseInput):
     def pillar_avoidance(self):
         self.make_task_df()
         #self.format_frames_oa()
+        ##drop rows 
+        self.data = self.data[self.data['trial_vidframes'].notna()]
         
 
-        # label odd/even trials (i.e. moving leftwards or moving rightwards?)
-        self.data['odd'] = np.nan
-        for i, ind in enumerate(self.data.index.values):
-            if ind%2 == 0: # odd values
-                self.data.at[ind, 'odd'] = True
-            elif ind%2 == 1:
-                self.data.at[ind, 'odd'] = False
+       
         ## convert pxl to cm 
         dist_to_posts = np.median(self.data['arenaTR_x'].iloc[0],0) - np.median(self.data['arenaTL_x'].iloc[0],0)
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
+        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
-        ##drop rows 
-        self.data = self.data[self.data['trial_vidframes'].notna()]
+        # label odd/even trials (i.e. moving leftwards or moving rightwards?)
+        for ind,row in self.data.iterrows():
+            if np.nanmean(row['nose_x_cm'][:10]) <= 20:
+                self.data.at[ind,'odd'] = True 
+            elif np.nanmean(row['nose_x_cm'][:10]) >=20:
+                self.data.at[ind,'odd'] = False
+
+        
 
         ## take median of arena points
         arena_cols = [col for col in self.data.columns if 'arena' in col]
@@ -334,14 +338,16 @@ class AvoidanceSession(BaseInput):
                 self.data.at[ind,'interp_' + key+ '_y_cm'] = filly.astype(object)
                 self.data.at[ind,'interp_' + key+ '_x_cm'] = fillx.astype(object)
         print('smoothing')
+        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
         ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion
 
         # get list of columns need for re indexing
-        keys = ['nose','leftear','rightear','spine','midspine']
+        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
         keys_list= [col for col in keys_list if 'lind' not in col]
-
+ 
         # check if odd or even trial
         #  get first index when nose crosses a distance thresh hold
         #trail start = ts
@@ -368,10 +374,13 @@ class AvoidanceSession(BaseInput):
         for ind, row in self.data.iterrows():
             nose_list = row['nose_x_cm']
             middle_time = np.where((nose_list > 30) & (nose_list < 50))
-            first,last = [middle_time[0][i] for i in (0, -1)] 
-            # calculate median of each corner
-            for col in obstacle_cols:
-                self.data.at[ind,'gt_'+ col]= np.nanmedian(row[col][first:last])
+            if len(middle_time[0]) == 0:
+                self.data = self.data.drop(ind)
+            else:
+                first,last = [middle_time[0][i] for i in (0, -1)] 
+                # calculate median of each corner
+                for col in obstacle_cols:
+                    self.data.at[ind,'gt_'+ col]= np.nanmedian(row[col][first:last])
         for ind, row in self.data.iterrows():
   
             xvals = np.stack([row['gt_obstacleTL_x'], row['gt_obstacleTR_x'], row['gt_obstacleBL_x'], row['gt_obstacleBR_x']])
