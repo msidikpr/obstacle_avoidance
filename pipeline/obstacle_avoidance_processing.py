@@ -301,7 +301,7 @@ class AvoidanceSession(BaseInput):
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
-        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        #self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
         for ind,row in self.data.iterrows():
@@ -319,6 +319,20 @@ class AvoidanceSession(BaseInput):
             for ind,row in self.data.iterrows():
                 self.data.at[ind,col] = np.mean(row[col])
         print('arena_median')
+
+        ## take median of ports
+        port_list =list_columns(self.data,['leftportT','rightportT'])
+        port_list = [i for i in port_list if 'cm' in i]
+        for pos in port_list:
+            for ind,row in self.data.iterrows():
+                self.data.at[ind,pos] = np.mean(row[pos])
+
+        ## mean port and arena
+        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
+        port_arena_list = [i for i in port_arena_list if 'cm' in i]
+        for pos in port_arena_list:
+           self.data['mean_'+pos] = self.data[pos].mean()
+
         ## interpolated traces of body parts
         keys = ['nose','leftear','rightear','spine','midspine']
         fake_time = np.linspace(0,1,200)

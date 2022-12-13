@@ -121,13 +121,13 @@ class plot_oa(BaseInput):
     def get_body_angle(self):
         #make cluster
         for ind, row in self.df.iterrows():
-            spine_x = row['ts_spine_x_cm']
-            spine_y = row['ts_spine_y_cm']
-            midspine_x = row['ts_midspine_x_cm']
-            midspine_y = row['ts_midspine_y_cm']
+            spine_x = row['ts_midspine_x_cm']
+            spine_y = row['ts_midspine_y_cm']
+            tail_x = row['ts_tailbase_x_cm']
+            tail_y = row['ts_tailbase_y_cm']
             angs = []
             for step in range(len(spine_x)):
-                ang = np.arctan2(midspine_y[step] - spine_y[step],midspine_x[step] - spine_x[step])
+                ang = np.arctan2(spine_y[step]-tail_y[step],spine_x[step]-tail_x[step])
                 angs.append(ang)
             self.df.at[ind, 'body_angle'] = np.array(angs).astype(object)
 
@@ -146,7 +146,9 @@ class plot_oa(BaseInput):
             nose_y = row['ts_nose_y_cm']
             angs = []
             for step in range(len(leftear_x)):
-                ang = np.arctan2(np.mean([leftear_y[step],rightear_y[step]])-nose_y[step],np.mean([leftear_x[step],rightear_x[step]])-nose_x[step])
+                #ang = np.arctan2(np.mean([leftear_y[step],rightear_y[step]])-nose_y[step],np.mean([leftear_x[step],rightear_x[step]])-nose_x[step])
+                ang = np.arctan2(nose_y[step]-np.mean([leftear_y[step],rightear_y[step]]),nose_x[step]-np.mean([leftear_x[step],rightear_x[step]]))
+
                 angs.append(ang)
             self.df.at[ind, 'head_angle'] = np.array(angs).astype(object)
 
@@ -162,8 +164,8 @@ class plot_oa(BaseInput):
                     current_ang= i
                     mouse_x1 = row['ts_nose_x_cm'][indx]
                     mouse_y1 = row['ts_nose_y_cm'][indx]
-                    mouse_x2 = mouse_x1-200 * np.cos(current_ang)
-                    mouse_y2 = mouse_y1-200* np.sin(current_ang)
+                    mouse_x2 = mouse_x1+200 * np.cos(current_ang)
+                    mouse_y2 = mouse_y1+200* np.sin(current_ang)
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
@@ -176,8 +178,8 @@ class plot_oa(BaseInput):
                     current_ang= i
                     mouse_x1 = row['ts_nose_x_cm'][indx]
                     mouse_y1 = row['ts_nose_y_cm'][indx]
-                    mouse_x2 = mouse_x1-200 * np.cos(current_ang)
-                    mouse_y2 = mouse_y1-200* np.sin(current_ang)
+                    mouse_x2 = mouse_x1+200 * np.cos(current_ang)
+                    mouse_y2 = mouse_y1+200* np.sin(current_ang)
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
@@ -203,10 +205,10 @@ class plot_oa(BaseInput):
                 obstacle_bottom=(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'])
                 for indx,i in enumerate(row['body_angle']):
                     current_ang= i
-                    mouse_x1 = row['ts_spine_x_cm'][indx]
-                    mouse_y1 = row['ts_spine_y_cm'][indx]
-                    mouse_x2 = mouse_x1-200 * np.cos(current_ang)
-                    mouse_y2 = mouse_y1-200* np.sin(current_ang)
+                    mouse_x1 = row['ts_midspine_x_cm'][indx]
+                    mouse_y1 = row['ts_midspine_y_cm'][indx]
+                    mouse_x2 = mouse_x1+200 * np.cos(current_ang)
+                    mouse_y2 = mouse_y1+200* np.sin(current_ang)
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
@@ -217,10 +219,10 @@ class plot_oa(BaseInput):
                 obstacle_bottom=(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'])
                 for indx,i in enumerate(row['body_angle']):
                     current_ang= i
-                    mouse_x1 = row['ts_spine_x_cm'][indx]
-                    mouse_y1 = row['ts_spine_y_cm'][indx]
-                    mouse_x2 = mouse_x1-200 * np.cos(current_ang)
-                    mouse_y2 = mouse_y1-200* np.sin(current_ang)
+                    mouse_x1 = row['ts_midspine_x_cm'][indx]
+                    mouse_y1 = row['ts_midspine_y_cm'][indx]
+                    mouse_x2 = mouse_x1+200 * np.cos(current_ang)
+                    mouse_y2 = mouse_y1+200* np.sin(current_ang)
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
@@ -228,8 +230,8 @@ class plot_oa(BaseInput):
             points_x = points_x[~np.isnan(points_x)]
             points_y = points_y[points_y!=0]
             points_x = points_y[~np.isnan(points_y)]
-            self.df.at[ind,'obstacle_intersect_spine_x'] = points_x.astype(object)
-            self.df.at[ind,'obstacle_intersect_spine_y'] = points_y.astype(object) 
+            self.df.at[ind,'obstacle_intersect_body_x'] = points_x.astype(object)
+            self.df.at[ind,'obstacle_intersect_body_y'] = points_y.astype(object) 
     ## find midpoint of facing edge 
     def get_midpoint_edge(self):
         for ind,row in self.df.iterrows():
@@ -274,10 +276,10 @@ class plot_oa(BaseInput):
 
     def process_df(self):
         self.cluster()
-        #self.get_body_angle()
+        self.get_body_angle()
         self.get_head_angle()
         self.get_midpoint_edge()
-        #self.get_obstacle_intersect_body()
+        self.get_obstacle_intersect_body()
         self.get_obstacle_intersect_nose()
         self.get_intersect_counts_bins()
         self.get_intersect_mean_counts()
@@ -355,6 +357,8 @@ class plot_oa(BaseInput):
                     plt.ylim([52,0]); plt.xlim([0, 72])
         pdf.savefig(); plt.close()
         pdf.close()
+
+        
     ##plot headangle by cluster
     def plot_headangle(self,savepath,filename):
         pdf = PdfPages(os.path.join(savepath,(filename) + '_figs.pdf'))
