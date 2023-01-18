@@ -258,7 +258,6 @@ class AvoidanceSession(BaseInput):
         
     def add_tracking(self, name, path):
         tc = Topcam(self.generic_camconfig, name, path, self.camname)
-        print('hey')
         tc.gather_camera_files()
         tc.pack_position_data()
         tc.filter_likelihood()
@@ -333,28 +332,8 @@ class AvoidanceSession(BaseInput):
         for pos in port_arena_list:
            self.data['mean_'+pos] = self.data[pos].mean()
 
-        ## interpolated traces of body parts
-        keys = ['nose','leftear','rightear','spine','midspine']
-        fake_time = np.linspace(0,1,200)
-        box_sz = 5 
-        box = np.ones(box_sz)/box_sz
-
-        count = 0
-        for ind, row in self.data.iterrows():
-            for key in keys:
-                xT = np.linspace(0,1,len(row[key + '_x'])); yT = np.linspace(0,1,len(row[key + '_y']))
-                intx = interp1d(xT, row[key + '_x_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
-                inty = interp1d(yT, row[key + '_y_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
-                fillx = pd.Series(intx).fillna(method='bfill').to_numpy()
-                filly = pd.Series(inty).fillna(method='bfill').to_numpy()
-
-                count += 1
-                self.data.at[ind,'interp_' + key+ '_y_cm'] = filly.astype(object)
-                self.data.at[ind,'interp_' + key+ '_x_cm'] = fillx.astype(object)
-        print('smoothing')
-        self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-
-        ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion
+        
+        ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion Trial start
 
         # get list of columns need for re indexing
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']

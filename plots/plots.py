@@ -269,6 +269,16 @@ class plot_oa(BaseInput):
                     mean_hist = np.mean(direction_frame['normalized_counts_intersect_nose_y'])
                     for ind,row in direction_frame.iterrows():
                         self.df.at[ind,'mean_normalized_counts_intersect_nose_y']=mean_hist.astype('object')
+    
+    
+    def facing_angle(self):
+        for ind,row in self.df.iterrows():
+            if np.mean(row['head_angle'][:10]) > 0:
+                self.df.at[ind,'facing_angle'] = True ## True means facing dowm postive value
+            elif np.mean(row['head_angle'][:10]) == 0:
+                self.df.at[ind,'facing_angle'] = np.nan
+            else: 
+                self.df.at[ind,'facing_angle'] = False
         
 
 
@@ -283,6 +293,7 @@ class plot_oa(BaseInput):
         self.get_obstacle_intersect_nose()
         self.get_intersect_counts_bins()
         self.get_intersect_mean_counts()
+        self.facing_angle()
         
 
          
@@ -358,7 +369,7 @@ class plot_oa(BaseInput):
         pdf.savefig(); plt.close()
         pdf.close()
 
-        
+
     ##plot headangle by cluster
     def plot_headangle(self,savepath,filename):
         pdf = PdfPages(os.path.join(savepath,(filename) + '_figs.pdf'))
