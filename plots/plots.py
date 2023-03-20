@@ -73,8 +73,8 @@ class plot_oa(BaseInput):
         #get mean of obstacle center
         for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
             x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
-            mean_cenx = np.mean(x['gt_obstacle_cen_x_cm'])
-            mean_ceny = np.mean(x['gt_obstacle_cen_y_cm'])
+            mean_cenx = np.nanmean(x['gt_obstacle_cen_x_cm'])
+            mean_ceny = np.nanmean(x['gt_obstacle_cen_y_cm'])
   
             for ind,row in self.df.iterrows(): 
                 if row['obstacle_cluster'] == cluster_name:
@@ -82,38 +82,70 @@ class plot_oa(BaseInput):
                     self.df.at[ind,'mean_gt_obstacle_cen_y_cm'] = mean_ceny
         #label cluster by position 
         self.df['cluster_label'] = np.nan
+        x_pos,y_pos  = np.sort(self.df['mean_gt_obstacle_cen_x_cm'].unique()),np.sort(self.df['mean_gt_obstacle_cen_y_cm'].unique())
+        col_1, col_2, col_3 = x_pos[0:3],x_pos[3:6],x_pos[6:9]
+        row_1, row_2, row_3 = y_pos[0:3],y_pos[3:6],y_pos[6:9]
         for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
             #label cluster by obstacle post
             x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
             for ind,row in x.iterrows():
-                # position top left label 0
-                if 26.511267901536936 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.262555270323688 and 19.603003146893094 <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.48005617413041:
-                    self.df.at[ind,'cluster_label'] = 0
-                # postion top middle lable 1     
-                if 34.224618031842425  <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 40.737819614353576  and 19.171765596431882  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.765871122032685:
+                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_1: 
+                     self.df.at[ind,'cluster_label'] = 0
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
                     self.df.at[ind,'cluster_label'] = 1
-                # postion top middle lable 2     
-                if 47.10153827545068   <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.15598067362944  and 19.386902039003104  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.36299006442639:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
                     self.df.at[ind,'cluster_label'] = 2
-                # postion top middle lable 3     
-                if 24.622638543067332    <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 30.32366857885396   and 24.072987056842724  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.06565031743722:
-                    self.df.at[ind,'cluster_label'] = 3 
-                # postion top middle lable 4     
-                if 34.33696422611072     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 39.16315460138148   and 23.33051936216178  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.21568031983405:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                    self.df.at[ind,'cluster_label'] = 3
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
                     self.df.at[ind,'cluster_label'] = 4
-                # postion top middle lable 5     
-                if 46.78662583258851     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.45490492362184   and 23.30309610363196  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 26.340749658133035:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
                     self.df.at[ind,'cluster_label'] = 5
-                # postion top middle lable 6     
-                if 23.672283873362495      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.24383212681531  and 31.13010098995012  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.9010213861951:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
                     self.df.at[ind,'cluster_label'] = 6
-                # postion top middle lable 7     
-                if 34.99528058841633      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 38.68741237003255   and 30.937326612118863  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.92257553927523:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
                     self.df.at[ind,'cluster_label'] = 7
-                # postion top middle lable 8     
-                if 47.0371762841755 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 52.09703145249776    and 30.463949607263373  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.749148951731954:
+
+                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
                     self.df.at[ind,'cluster_label'] = 8
-        self.df['cluster_label'] = self.df['cluster_label'].astype('int')
+
+
+
+               ## position top left label 0
+               #if 26.511267901536936 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.262555270323688 and 19.603003146893094 <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.48005617413041:
+               #    self.df.at[ind,'cluster_label'] = 0
+               ## postion top middle lable 1     
+               #if 34.224618031842425  <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 40.737819614353576  and 19.171765596431882  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.765871122032685:
+               #    self.df.at[ind,'cluster_label'] = 1
+               ## postion top middle lable 2     
+               #if 47.10153827545068   <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.15598067362944  and 19.386902039003104  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.36299006442639:
+               #    self.df.at[ind,'cluster_label'] = 2
+               ## postion top middle lable 3     
+               #if 24.622638543067332    <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 30.32366857885396   and 24.072987056842724  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.06565031743722:
+               #    self.df.at[ind,'cluster_label'] = 3 
+               ## postion top middle lable 4     
+               #if 34.33696422611072     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 39.16315460138148   and 23.33051936216178  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.21568031983405:
+               #    self.df.at[ind,'cluster_label'] = 4
+               ## postion top middle lable 5     
+               #if 46.78662583258851     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.45490492362184   and 23.30309610363196  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 26.340749658133035:
+               #    self.df.at[ind,'cluster_label'] = 5
+               ## postion top middle lable 6     
+               #if 23.672283873362495      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.24383212681531  and 31.13010098995012  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.9010213861951:
+               #    self.df.at[ind,'cluster_label'] = 6
+               ## postion top middle lable 7     
+               #if 34.99528058841633      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 38.68741237003255   and 30.937326612118863  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.92257553927523:
+               #    self.df.at[ind,'cluster_label'] = 7
+               ## postion top middle lable 8     
+               #if 47.0371762841755 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 52.09703145249776    and 30.463949607263373  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.749148951731954:
+               #    self.df.at[ind,'cluster_label'] = 8
+        self.df['cluster_label'] = self.df['cluster_label']
 
 
     

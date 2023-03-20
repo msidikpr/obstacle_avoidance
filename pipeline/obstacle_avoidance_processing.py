@@ -12,6 +12,7 @@ from sklearn.cluster import KMeans
 import matplotlib.colors as mcolors
 import glob
 import h5py
+from astropy.convolution import interpolate_replace_nans
 
 
 import sys
@@ -35,19 +36,21 @@ class AvoidanceProcessing(BaseInput):
 
         self.path = self.metadata['path']
         self.dates_list = [i for i in list(self.metadata.keys()) if i != 'path']
+        self.tasktype = task
         if task=='oa':
             self.is_pillar_avoidance = True
-            self.is_gap_detection = False
-        #elif task=='gd':
-            #self.is_pillar_avoidance = False
-            #self.is_gap_detection = True
+            self.is_non_obstacle = False
+        elif task =='non_obstalce':
+            self.is_non_obstacle = True
+            self.is_pillar_avoidance = False
 
         if self.is_pillar_avoidance:
             self.dlc_project = {'light':'/home/niell_lab/Documents/deeplabcut_projects/object_avoidance-Mike-2021-08-31/config.yaml',
                                 'dark':None}
-        #elif self.is_gap_detection:
-            #self.dlc_project = {'light':'/home/niell_lab/Documents/deeplabcut_projects/gap_determination-Kana-2021-10-19/config.yaml',
-                                #'dark':'/home/niell_lab/Documents/deeplabcut_projects/dark_gap_determination-Kana-2021-11-08/config.yaml'}
+
+        elif self.is_non_obstacle:
+            self.dlc_project = {'light':'/home/niell_lab/Documents/deeplabcut_projects/object_avoidance-Mike-2021-08-31/config.yaml',
+                                'dark':None}
         self.camname = 'top1'
         self.generic_camconfig = {
             'paths': {
@@ -60,7 +63,7 @@ class AvoidanceProcessing(BaseInput):
                 'crop_for_dlc': False,
                 'filter_dlc_predictions': False,
                 'multianimal_top_project': False,
-                'likelihood_threshold': 0.99
+                'likelihood_threshold': 0.75
             }
         }
     ## gather sessions from jason metadata
@@ -123,6 +126,7 @@ class AvoidanceProcessing(BaseInput):
                     #camconfig['paths']['dlc_projects'][self.camname] = self.dlc_project['dark']
                 for recording_name in [k for k,v in self.metadata[date][animal].items()]:
                     recording_dir = os.path.join(animal_dir, recording_name)
+                    print(recording_dir)
                     name = '_'.join(os.path.splitext(os.path.split([i for i in find('*.avi', recording_dir) if all(bad not in i for bad in ['plot','IR','rep11','betafpv','side_gaze','._'])][0])[1])[0].split('_')[:-2])
                     tc = Topcam(config=camconfig, recording_name=name, recording_path=recording_dir, camname=self.camname)
                     tc.pose_estimation()
@@ -138,9 +142,10 @@ class AvoidanceProcessing(BaseInput):
         self.gather_all_sessions()
         #print('check')
         for trial_ind, trial_row in tqdm(self.all_sessions.iterrows()):
+            #print(trial_row)
             try:
                 # analyze each trial
-                trial = AvoidanceSession(trial_row, self.path, self.metadata)
+                trial = AvoidanceSession(trial_row, self.path, self.metadata,self.tasktype)
 
             
                 dlc_h5 = find('*'+str(trial_row['date'])+'*'+str(trial_row['animal'])+'*'+str(trial_row['task'])+'*.h5', self.path)
@@ -153,8 +158,8 @@ class AvoidanceProcessing(BaseInput):
                 trial.add_tracking(trial_name, trial_path)
                 if self.is_pillar_avoidance:
                     trial.pillar_avoidance()
-                elif self.is_gap_detection:
-                    trial.gap_detection()
+                elif self.is_non_obstacle:
+                    trial.non_obstacle()
                 # make short diagnostic video
                 if videos:
                     trial.make_videos()
@@ -165,9 +170,10 @@ class AvoidanceProcessing(BaseInput):
 ## Process individual recoring sessions
 
 class AvoidanceSession(BaseInput):
-    def __init__(self, s_input, path_input, metadata_input):
+    def __init__(self, s_input, path_input, metadata_input,task):
         self.s = s_input # series from dataframe of all trials
-        self.likelihood_thresh = 0.99
+        self.tasktype = task
+        self.likelihood_thresh = 0.75
         self.dist_across_arena = 48.26 # cm between bottom-right and bottom-left pillar
         self.path = path_input
         self.camname = 'top1'
@@ -180,7 +186,7 @@ class AvoidanceSession(BaseInput):
         self.generic_camconfig = {
             'internals': {
                 'follow_strict_naming': False,
-                'likelihood_threshold': 0.99
+                'likelihood_threshold': 0.75
             }
         }
     
@@ -226,9 +232,15 @@ class AvoidanceSession(BaseInput):
                 df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
                
         df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task']
+        if self.tasktype == 'non_obstalce':
+            print('non_obstalce')
+
 
         print('df made')
+        
         self.data = df1
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
         
 
     ## format frames 
@@ -270,6 +282,10 @@ class AvoidanceSession(BaseInput):
     def convert_pxls_to_dist(self):
         x_cols = [i for i in self.data.columns.values if '_x' in i]
         y_cols = [i for i in self.data.columns.values if '_y' in i]
+        if self.tasktype == 'non_obstalce':
+            x_cols = [i for i in x_cols if 'obstacle' not in i]
+            print(x_cols)
+            y_cols = [i for i in y_cols if 'obstacle' not in i]
         for i in range(len(x_cols)):
             self.data[x_cols[i]+'_cm'] = self.data.loc[:,x_cols[i]] / self.pxls2cm
             self.data[y_cols[i]+'_cm'] = self.data.loc[:,y_cols[i]] / self.pxls2cm
@@ -287,6 +303,48 @@ class AvoidanceSession(BaseInput):
             df.at[ind,'median_x_cm'] = median_trace[0,:].astype(object); df.at[ind,'median_y_cm'] = median_trace[1,:].astype(object)
     
     
+    def non_obstacle(self):
+        print(self.tasktype) 
+        self.make_task_df()
+        self.data = self.data[self.data['trial_vidframes'].notna()]
+        dist_to_posts = np.median(self.data['arenaTR_x'].iloc[0],0) - np.median(self.data['arenaTL_x'].iloc[0],0)
+        self.pxls2cm = dist_to_posts/self.dist_across_arena
+        self.convert_pxls_to_dist()
+        print('pxl')
+        # label odd/even trials (i.e. moving leftwards or moving rightwards?)
+        for ind,row in self.data.iterrows():
+            if np.nanmean(row['nose_x_cm'][:10]) <= 20:
+                self.data.at[ind,'odd'] = True 
+            elif np.nanmean(row['nose_x_cm'][:10]) >=20:
+                self.data.at[ind,'odd'] = False
+
+        
+
+        ## take median of arena points
+        arena_cols = [col for col in self.data.columns if 'arena' in col]
+        arena_cols =[col for col in arena_cols if 'likelihood' not in col]
+        for col in arena_cols:
+            for ind,row in self.data.iterrows():
+                self.data.at[ind,col] = np.mean(row[col])
+        print('arena_median')
+
+        ## take median of ports
+        port_list =list_columns(self.data,['leftportT','rightportT'])
+        port_list = [i for i in port_list if 'cm' in i]
+        for pos in port_list:
+            for ind,row in self.data.iterrows():
+                self.data.at[ind,pos] = np.mean(row[pos])
+        print('ports_median')
+
+        ## mean port and arena
+        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
+        port_arena_list = [i for i in port_arena_list if 'cm' in i]
+        for pos in port_arena_list:
+           self.data['mean_'+pos] = self.data[pos].mean()
+        print('mean')
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
+
     def pillar_avoidance(self):
         self.make_task_df()
         #self.format_frames_oa()
@@ -325,12 +383,16 @@ class AvoidanceSession(BaseInput):
         for pos in port_list:
             for ind,row in self.data.iterrows():
                 self.data.at[ind,pos] = np.mean(row[pos])
+        print('ports_median')
 
         ## mean port and arena
         port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
         port_arena_list = [i for i in port_arena_list if 'cm' in i]
         for pos in port_arena_list:
            self.data['mean_'+pos] = self.data[pos].mean()
+        print('mean')
+        self.data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
 
         
         ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion Trial start
@@ -360,20 +422,28 @@ class AvoidanceSession(BaseInput):
                 even_ind = np.argmax(nose_list<56)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
+        print('odd_even')
+        self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        print('test')
 
         ##  median point at gt obstacle 
         obstacle_cols = list_columns(self.data,['obstacle'])
         obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
+
         for ind, row in self.data.iterrows():
             nose_list = row['nose_x_cm']
-            middle_time = np.where((nose_list > 30) & (nose_list < 50))
+            middle_time = np.where((nose_list > 25) & (nose_list < 50))
             if len(middle_time[0]) == 0:
                 self.data = self.data.drop(ind)
             else:
                 first,last = [middle_time[0][i] for i in (0, -1)] 
                 # calculate median of each corner
                 for col in obstacle_cols:
-                    self.data.at[ind,'gt_'+ col]= np.nanmedian(row[col][first:last])
+                    trace = row[col][first:last]
+                    #trace = trace.astype('float')
+                    #kernel = np.ones(len(trace))
+                    #trace = interpolate_replace_nans(trace,kernel)
+                    self.data.at[ind,'gt_'+ col]= np.nanmean(trace)
         for ind, row in self.data.iterrows():
   
             xvals = np.stack([row['gt_obstacleTL_x'], row['gt_obstacleTR_x'], row['gt_obstacleBL_x'], row['gt_obstacleBR_x']])
@@ -385,6 +455,7 @@ class AvoidanceSession(BaseInput):
             yvals_cm = np.stack([row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBL_y_cm'], row['gt_obstacleBR_y_cm']])
             self.data.at[ind,'gt_obstacle_cen_y' ] = np.mean(yvals)
             self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.mean(yvals_cm)
+        print('ob_cen')
 
 
         # drop any transits that were really slow (only drop slowest 10% of transits)
