@@ -8,7 +8,7 @@ from pipeline.obstacle_avoidance_processing import AvoidanceProcessing
 
 
 # metadata json path
-metadata_path = 'D:/obstacle_avoidance/metadata/non_obstacle_test.json'
+metadata_path = 'D:/obstacle_avoidance/metadata/non_obstacle_042423_042523.json'
 
 
 #C:\Users\nlab\Desktop\mike_bonsai\recordings\metadata
@@ -18,7 +18,7 @@ metadata_path = 'D:/obstacle_avoidance/metadata/non_obstacle_test.json'
 task_name = 'non_obstalce'
 
 session = AvoidanceProcessing(metadata_path, task=task_name) 
-session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\no_obstacle-Mike-2023-03-20\config.yaml")
+session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\no_obstacle_041723-Mike-2023-04-18\config.yaml")
 session.dlc_project
-#session.preprocess()
+session.preprocess()
 session.process()

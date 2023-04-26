@@ -51,7 +51,7 @@ class plot_oa(BaseInput):
             for ani in use_animals:
                 for task in os.listdir(data_path / date / ani):
                     h5_paths=[str(i) for i in list((data_path / date / ani/ task).rglob('*.h5'))]
-                    raw_h5 = [i for i in h5_paths if 'raw' in i]
+                    raw_h5 = [i for i in h5_paths if 'test' in i]
                     hf_list.append(raw_h5)
         hf_list = list(itertools.chain(*hf_list))
         for h5 in hf_list:

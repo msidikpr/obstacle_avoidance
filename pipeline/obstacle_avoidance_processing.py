@@ -313,10 +313,12 @@ class AvoidanceSession(BaseInput):
         print('pxl')
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
         for ind,row in self.data.iterrows():
-            if np.nanmean(row['nose_x_cm'][:10]) <= 20:
-                self.data.at[ind,'odd'] = True 
-            elif np.nanmean(row['nose_x_cm'][:10]) >=20:
-                self.data.at[ind,'odd'] = False
+            nose_points = row['nose_x_cm'].astype(float)
+            nose_points = nose_points[~np.isnan(nose_points)]
+            if np.nanmean(nose_points[:10])<= 20:
+                self.data.at[ind,'odd'] = 'left'
+            elif np.nanmean(nose_points[:10]) >=20:
+                self.data.at[ind,'odd'] = 'right'
 
         
 
@@ -342,6 +344,27 @@ class AvoidanceSession(BaseInput):
         for pos in port_arena_list:
            self.data['mean_'+pos] = self.data[pos].mean()
         print('mean')
+        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        keys_list = list_columns(self.data,keys)
+        keys_list= [col for col in keys_list if 'likelihood' not in col]
+        keys_list= [col for col in keys_list if 'lind' not in col]
+        for ind, row in self.data.iterrows(): 
+            if row['odd'] == 'left':
+                nose_list = row['nose_x_cm'] 
+                odd_ind = np.argmax(nose_list>16)
+                for key in keys_list:
+                    self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
+                #use odd_ind to index into obstacle 
+                # iterate over columns list  
+
+                #create gt_obstacle points
+            else: 
+                nose_list = row['nose_x_cm']
+                even_ind = np.argmax(nose_list<50)
+                for key in keys_list:
+                    self.data.at[ind,'ts_' + key] = row[key][even_ind:]
+        print('gt')
+        self.data['time'] = self.data['len']/60
         self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
 
@@ -362,10 +385,16 @@ class AvoidanceSession(BaseInput):
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
         for ind,row in self.data.iterrows():
-            if np.nanmean(row['nose_x_cm'][:10]) <= 20:
-                self.data.at[ind,'odd'] = True 
-            elif np.nanmean(row['nose_x_cm'][:10]) >=20:
+            nose_points = row['nose_x_cm'].astype(float)
+            nose_points = nose_points[~np.isnan(nose_points)]
+            if np.nanmean(nose_points[:10])<= 20:
+                self.data.at[ind,'odd'] = True
+            elif np.nanmean(nose_points[:10]) >=20:
                 self.data.at[ind,'odd'] = False
+           # if np.nanmean(row['nose_x_cm'][:10]) <= 20:
+            #    self.data.at[ind,'odd'] = True 
+            #elif np.nanmean(row['nose_x_cm'][:10]) >=20:
+             #   self.data.at[ind,'odd'] = False
 
         
 
@@ -391,6 +420,7 @@ class AvoidanceSession(BaseInput):
         for pos in port_arena_list:
            self.data['mean_'+pos] = self.data[pos].mean()
         print('mean')
+        
         self.data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
 
@@ -419,7 +449,7 @@ class AvoidanceSession(BaseInput):
                 #create gt_obstacle points
             else: 
                 nose_list = row['nose_x_cm']
-                even_ind = np.argmax(nose_list<56)
+                even_ind = np.argmax(nose_list<50)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
         print('odd_even')
