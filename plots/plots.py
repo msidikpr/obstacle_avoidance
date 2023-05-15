@@ -8,39 +8,46 @@ import xarray as xr
 import seaborn as sns
 import h5py as hf
 from tqdm import tqdm
-from tqdm import tqdm
 import itertools 
 from scipy.interpolate import interp1d
 from scipy import signal
 from sklearn.cluster import KMeans
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 import os, fnmatch
 
 import sys
 sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
 
+import warnings
+warnings.filterwarnings('ignore')
+
 from utils.base_functions import *
 from src.utils.auxiliary import flatten_series
 from src.utils.path import find
 from src.base import BaseInput
 
-import warnings
-warnings.filterwarnings('ignore')
+
 
 
 
 ## take raw_df from multiple session and plt  
 class plot_oa(BaseInput):
 
-    def __init__(self,metadata_path,cluster=False,plot_trace=False):
-        with open(metadata_path) as f:
-            self.metadata = json.load(f)
+    def __init__(self,metadata_path,df):
+        try:
+            with open(metadata_path) as f:
+                self.metadata = json.load(f)
+                self.path = self.metadata['path']
+                self.dates_list = [i for i in list(self.metadata.keys()) if i != 'path' ]
+        except FileNotFoundError:
+            pass
 
-        self.path = self.metadata['path']
-        self.dates_list = [i for i in list(self.metadata.keys()) if i != 'path' ]
+        self.df = df 
+        
     ## append df's together
-    def gather_session_df(self):
+    def gather_session_df(self,tasktype):
         # list data path files
         data_path = Path(self.path).expanduser()
         # find date
@@ -51,15 +58,21 @@ class plot_oa(BaseInput):
             for ani in use_animals:
                 for task in os.listdir(data_path / date / ani):
                     h5_paths=[str(i) for i in list((data_path / date / ani/ task).rglob('*.h5'))]
-                    raw_h5 = [i for i in h5_paths if 'test' in i]
-                    hf_list.append(raw_h5)
+                    #print(h5_paths)
+                    if tasktype == 'non_obstalce':
+                        raw_h5 = [i for i in h5_paths if 'non' in i]
+                        hf_list.append(raw_h5)
+                    if tasktype == 'obstacle':
+                        raw_h5 = [i for i in h5_paths if 'processed_' in i]
+                        hf_list.append(raw_h5)
+            #hf_list.append(raw_h5)
         hf_list = list(itertools.chain(*hf_list))
         for h5 in hf_list:
             data = pd.read_hdf(h5)
             df=df.append(data,ignore_index=True)
         self.df=df
     ##cluster obstacle positions
-    def cluster(self):
+    def cluster(self,numcluster):
         self.df = self.df[self.df['gt_obstacle_cen_x_cm'].notna()]
 
 
@@ -67,7 +80,7 @@ class plot_oa(BaseInput):
 
         kmeans_input = np.transpose(kmeans_input)
 
-        labels = KMeans(n_clusters=9).fit(kmeans_input).labels_
+        labels = KMeans(n_clusters=numcluster).fit(kmeans_input).labels_
         self.df['obstacle_cluster'] = labels
 
         #get mean of obstacle center
@@ -81,71 +94,79 @@ class plot_oa(BaseInput):
                     self.df.at[ind,'mean_gt_obstacle_cen_x_cm'] = mean_cenx
                     self.df.at[ind,'mean_gt_obstacle_cen_y_cm'] = mean_ceny
         #label cluster by position 
-        self.df['cluster_label'] = np.nan
-        x_pos,y_pos  = np.sort(self.df['mean_gt_obstacle_cen_x_cm'].unique()),np.sort(self.df['mean_gt_obstacle_cen_y_cm'].unique())
-        col_1, col_2, col_3 = x_pos[0:3],x_pos[3:6],x_pos[6:9]
-        row_1, row_2, row_3 = y_pos[0:3],y_pos[3:6],y_pos[6:9]
-        for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
-            #label cluster by obstacle post
-            x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
-            for ind,row in x.iterrows():
-                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_1: 
-                     self.df.at[ind,'cluster_label'] = 0
+        if numcluster == 9:
+            print(numcluster)
+            self.df['cluster_label'] = np.nan
+            x_pos,y_pos  = np.sort(self.df['mean_gt_obstacle_cen_x_cm'].unique()),np.sort(self.df['mean_gt_obstacle_cen_y_cm'].unique())
+            col_1, col_2, col_3 = x_pos[0:3],x_pos[3:6],x_pos[6:9]
+            row_1, row_2, row_3 = y_pos[0:3],y_pos[3:6],y_pos[6:9]
+            for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
+                #label cluster by obstacle post
+                x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
+                for ind,row in x.iterrows():
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_1: 
+                         self.df.at[ind,'cluster_label'] = 0
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
-                    self.df.at[ind,'cluster_label'] = 1
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
+                        self.df.at[ind,'cluster_label'] = 1
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
-                    self.df.at[ind,'cluster_label'] = 2
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
+                        self.df.at[ind,'cluster_label'] = 2
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
-                    self.df.at[ind,'cluster_label'] = 3
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        self.df.at[ind,'cluster_label'] = 3
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
-                    self.df.at[ind,'cluster_label'] = 4
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        self.df.at[ind,'cluster_label'] = 4
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
-                    self.df.at[ind,'cluster_label'] = 5
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        self.df.at[ind,'cluster_label'] = 5
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
-                    self.df.at[ind,'cluster_label'] = 6
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
+                        self.df.at[ind,'cluster_label'] = 6
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
-                    self.df.at[ind,'cluster_label'] = 7
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
+                        self.df.at[ind,'cluster_label'] = 7
 
-                if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
-                    self.df.at[ind,'cluster_label'] = 8
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
+                        self.df.at[ind,'cluster_label'] = 8
+        elif numcluster == 6:
+            print(numcluster)
+            self.df['cluster_label'] = np.nan
+            x_pos,y_pos  = np.sort(self.df['mean_gt_obstacle_cen_x_cm'].unique()),np.sort(self.df['mean_gt_obstacle_cen_y_cm'].unique())
+            col_1, col_2 = x_pos[0:3],x_pos[3:6]
+            row_1, row_2, row_3 = y_pos[0:2],y_pos[2:4],y_pos[4:6]
+            for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
+                #label cluster by obstacle post
+                x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
+                for ind,row in x.iterrows():
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_1: 
+                         self.df.at[ind,'cluster_label'] = 0
 
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
+                        self.df.at[ind,'cluster_label'] = 1
 
+                    #if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_1:
+                     #   self.df.at[ind,'cluster_label'] = 2
 
-               ## position top left label 0
-               #if 26.511267901536936 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.262555270323688 and 19.603003146893094 <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.48005617413041:
-               #    self.df.at[ind,'cluster_label'] = 0
-               ## postion top middle lable 1     
-               #if 34.224618031842425  <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 40.737819614353576  and 19.171765596431882  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.765871122032685:
-               #    self.df.at[ind,'cluster_label'] = 1
-               ## postion top middle lable 2     
-               #if 47.10153827545068   <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.15598067362944  and 19.386902039003104  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 21.36299006442639:
-               #    self.df.at[ind,'cluster_label'] = 2
-               ## postion top middle lable 3     
-               #if 24.622638543067332    <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 30.32366857885396   and 24.072987056842724  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.06565031743722:
-               #    self.df.at[ind,'cluster_label'] = 3 
-               ## postion top middle lable 4     
-               #if 34.33696422611072     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 39.16315460138148   and 23.33051936216178  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 28.21568031983405:
-               #    self.df.at[ind,'cluster_label'] = 4
-               ## postion top middle lable 5     
-               #if 46.78662583258851     <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 51.45490492362184   and 23.30309610363196  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 26.340749658133035:
-               #    self.df.at[ind,'cluster_label'] = 5
-               ## postion top middle lable 6     
-               #if 23.672283873362495      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 29.24383212681531  and 31.13010098995012  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.9010213861951:
-               #    self.df.at[ind,'cluster_label'] = 6
-               ## postion top middle lable 7     
-               #if 34.99528058841633      <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 38.68741237003255   and 30.937326612118863  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.92257553927523:
-               #    self.df.at[ind,'cluster_label'] = 7
-               ## postion top middle lable 8     
-               #if 47.0371762841755 <= x['mean_gt_obstacle_cen_x_cm'].unique() <= 52.09703145249776    and 30.463949607263373  <= x['mean_gt_obstacle_cen_y_cm'].unique() <= 32.749148951731954:
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        self.df.at[ind,'cluster_label'] = 2
+
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        self.df.at[ind,'cluster_label'] = 3
+
+                    #if row['mean_gt_obstacle_cen_x_cm'] in col_3 and row['mean_gt_obstacle_cen_y_cm'] in row_2:
+                        #self.df.at[ind,'cluster_label'] = 5
+
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_1 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
+                        self.df.at[ind,'cluster_label'] = 4
+
+                    if row['mean_gt_obstacle_cen_x_cm'] in col_2 and row['mean_gt_obstacle_cen_y_cm'] in row_3:
+                        self.df.at[ind,'cluster_label'] = 5
+
+                
                #    self.df.at[ind,'cluster_label'] = 8
-        self.df['cluster_label'] = self.df['cluster_label']
+        self.df['obstacle_cluster'] = self.df['cluster_label'].astype(int)
 
 
     
@@ -187,7 +208,7 @@ class plot_oa(BaseInput):
     ## find intersection of head angle to facing side of obstacle 
     def get_obstacle_intersect_nose(self):
         for ind,row in self.df.iterrows():
-            if row['odd'] == False:
+            if row['odd'] == 'right':
                 points_x = np.zeros(len(row['head_angle']))
                 points_y = np.zeros(len(row['head_angle']))
                 obstacle_top= (row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'] -6)
@@ -201,7 +222,7 @@ class plot_oa(BaseInput):
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
-            if row['odd'] == True:
+            if row['odd'] == 'left':
                 points_x = np.zeros(len(row['head_angle']))
                 points_y = np.zeros(len(row['head_angle']))
                 obstacle_top= (row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm']-6)
@@ -230,7 +251,7 @@ class plot_oa(BaseInput):
     ## find intersection of head angle
     def get_obstacle_intersect_body(self):
         for ind,row in self.df.iterrows():
-            if row['odd'] == False:
+            if row['odd'] == 'right':
                 points_x = np.zeros(len(row['body_angle']))
                 points_y = np.zeros(len(row['body_angle']))
                 obstacle_top= (row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'])
@@ -244,7 +265,7 @@ class plot_oa(BaseInput):
                     intersect_point=intersect((mouse_x1,mouse_y1),(mouse_x2,mouse_y2),obstacle_top,obstacle_bottom)
                     points_x[indx] = intersect_point[0]
                     points_y[indx] = intersect_point[1]
-            if row['odd'] == True:
+            if row['odd'] == 'left':
                 points_x = np.zeros(len(row['body_angle']))
                 points_y = np.zeros(len(row['body_angle']))
                 obstacle_top= (row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'])
@@ -267,13 +288,13 @@ class plot_oa(BaseInput):
     ## find midpoint of facing edge 
     def get_midpoint_edge(self):
         for ind,row in self.df.iterrows():
-         if row['odd'] == False:
+         if row['odd'] == 'right':
             obstacle_top= (row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'])
             obstacle_bottom=(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'])
             edge_mid = midpoint(obstacle_top[0],obstacle_top[1],obstacle_bottom[0],obstacle_bottom[1])
             self.df.at[ind,'obstacle_edge_mid_x_cm'] = edge_mid[0]
             self.df.at[ind,'obstacle_edge_mid_y_cm'] = edge_mid[1]
-         if row['odd'] == True:
+         if row['odd'] == 'left':
              obstacle_top= (row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'])
              obstacle_bottom=(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'])
              edge_mid = midpoint(obstacle_top[0],obstacle_top[1],obstacle_bottom[0],obstacle_bottom[1])
@@ -311,13 +332,37 @@ class plot_oa(BaseInput):
                 self.df.at[ind,'facing_angle'] = np.nan
             else: 
                 self.df.at[ind,'facing_angle'] = False
+    
+    def get_angle_to_ports(self):
+
+        for ind,row in self.df.iterrows():
+            angle_to_rightport = []
+            angle_to_leftport = []
+            rightport = [row['rightportT_x_cm'],row['rightportT_y_cm']]
+            leftport = [row['leftportT_x_cm'],row['leftportT_y_cm']]
+            for indx in range(len(row['ts_nose_x_cm'])):
+                center = [np.mean([row['ts_rightear_x_cm'][indx],row['ts_leftear_x_cm'][indx]]),np.mean([row['ts_rightear_y_cm'][indx],row['ts_leftear_y_cm'][indx]])]
+                nose_points = [row['ts_nose_x_cm'][indx],row['ts_nose_y_cm'][indx]]
+                angleright = calculate_angle(center, nose_points, rightport)
+                angleleft = calculate_angle(center, nose_points, leftport)
+                angle_to_rightport.append(angleright)
+                angle_to_leftport.append(angleleft)
+            self.df.at[ind,'angle_to_rightport'] = np.array(angle_to_rightport).astype(object)
+            self.df.at[ind,'angle_to_leftport'] = np.array(angle_to_leftport).astype(object)
+
+        right_left = ['angle_to_leftport','angle_to_rightport','ts_nose_x_cm','ts_nose_y_cm']
+        for ind,row in self.df.iterrows():
+            for direction in right_left:
+                interp = pd.Series(row[direction].astype(float)).interpolate().values
+                resample = signal.resample(interp,200)
+                self.df.at[ind,'resample_'+ direction] = resample.astype(object)
         
 
 
 
 
-    def process_df(self):
-        self.cluster()
+    def process_df(self,numcluster):
+        self.cluster(numcluster)
         self.get_body_angle()
         self.get_head_angle()
         self.get_midpoint_edge()
@@ -326,141 +371,434 @@ class plot_oa(BaseInput):
         self.get_intersect_counts_bins()
         self.get_intersect_mean_counts()
         self.facing_angle()
+        self.get_angle_to_ports()
         
 
          
 
 
-
-##
-
-
-
-
     ## plot the traces by cluster
-    def plot_trace_cluster_single_animal(self,savepath,filename):
-        pdf = PdfPages(os.path.join(savepath,(filename) + '_figs.pdf'))
-        ##Left ward trials
-        fig, ax = plt.subplots(3,3, figsize=(25,21),dpi=50)
-        fig.suptitle('Right Start'+'_'+str(self.df['animal'].unique()), size = 20)
-        for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
-            x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
-            for i, row in x.iterrows():
-                if row['odd'] == False:
-                    plt.subplot(3,3,cluster_name+1)
-                    plt.gca().set_aspect('equal', adjustable='box')
-                    plt.gca().set_title(str(row['obstacle_cluster']))
+    def plot_trace_cluster_single_animal(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            by_date = animal_frame.groupby(['date'])
+            for date, date_frame in by_date:
+                df = date_frame
+                savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+                pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date).item()) + '_' + str(pd.unique(df.animal).item()))+ 'cluster.pdf'))
 
-                    plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
-                        [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
+            ##Left ward trials
+                fig, ax = plt.subplots(3,2, figsize=(25,21),dpi=50)
+                fig.suptitle('Right Start'+'_'+str(df['animal'].unique()), size = 20)
+                for clusters, cluster_name in enumerate(df['obstacle_cluster'].unique()):
+                    x=df.loc[df['obstacle_cluster']==cluster_name]
+                    for i, row in x.iterrows():
+                        if row['odd'] == 'left':
+                            plt.subplot(3,2,cluster_name+1)
+                            plt.gca().set_aspect('equal', adjustable='box')
+                            plt.gca().set_title(str(row['obstacle_cluster']))
 
-
-                    plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
-                        [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
-
-
-
-
-                    plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
-                    plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
-                    plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
-                    sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False) 
-                    #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
-                    plt.ylim([52,0]); plt.xlim([0, 72])
-        pdf.savefig(); plt.close()
-        fig, ax = plt.subplots(3,3, figsize=(25,21),dpi = 50)
-        fig.suptitle('Left Start'+'_'+str(self.df['animal'].unique()), size = 20)
-
-        
+                            plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                                [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
 
 
-        for clusters, cluster_name in enumerate(self.df['obstacle_cluster'].unique()):
-            x=self.df.loc[self.df['obstacle_cluster']==cluster_name]
-            for i, row in x.iterrows():
-                if row['odd'] == True:
-                    plt.subplot(3,3,cluster_name+1)
-                    plt.gca().set_aspect('equal', adjustable='box')
-                    plt.gca().set_title(str(row['obstacle_cluster']))
-
-                    plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
-                        [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
-
-
-                    plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
-                        [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+                            plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                                [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
 
 
 
 
-                    plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
-                    plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
-                    plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
-                    sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False) 
-                    #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
-                    plt.ylim([52,0]); plt.xlim([0, 72])
-        pdf.savefig(); plt.close()
-        pdf.close()
+                            plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                            plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                            plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                            sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False,s =20 ) 
+                            #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
+                            plt.ylim([52,0]); plt.xlim([0, 72])
+                pdf.savefig(); plt.close()
+
+                fig, ax = plt.subplots(3,3, figsize=(25,21),dpi = 50)
+                fig.suptitle('Left Start'+'_'+str(df['animal'].unique()), size = 20)
+                for clusters, cluster_name in enumerate(df['obstacle_cluster'].unique()):
+                    x=df.loc[df['obstacle_cluster']==cluster_name]
+                    for i, row in x.iterrows():
+                        if row['odd'] == 'right':
+                            plt.subplot(3,2,cluster_name+1)
+                            plt.gca().set_aspect('equal', adjustable='box')
+                            plt.gca().set_title(str(row['obstacle_cluster']))
+
+                            plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                                [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
+
+
+                            plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                                [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+
+
+
+
+                            plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                            plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                            plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                            sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False, s = 7) 
+                            #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
+                            plt.ylim([52,0]); plt.xlim([0, 72])
+                pdf.savefig(); plt.close()
+                pdf.close()
+
+
+    ## plot the traces by cluster over multiple days
+    def plot_trace_cluster_single_animal_multiday(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            df = animal_frame
+            savepath_session = os.path.join(*[savepath,'figures'])
+            pdf = PdfPages(os.path.join((savepath_session),( str(pd.unique(df.animal).item())) + 'cluster_multiday.pdf'))
+
+            ##Left ward trials
+            fig, ax = plt.subplots(3,2, figsize=(25,21),dpi=50)
+            fig.suptitle('Right Start'+'_'+str(df['animal'].unique()), size = 20)
+            for clusters, cluster_name in enumerate(df['obstacle_cluster'].unique()):
+                x=df.loc[df['obstacle_cluster']==cluster_name]
+                for i, row in x.iterrows():
+                    if row['odd'] == 'left':
+                        plt.subplot(3,2,cluster_name+1)
+                        plt.gca().set_aspect('equal', adjustable='box')
+                        plt.gca().set_title(str(row['obstacle_cluster']))
+
+                        plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                            [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
+
+
+                        plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                            [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+
+
+
+
+                        plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                        plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                        plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                        sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False,s =7 ) 
+                        #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
+                        plt.ylim([52,0]); plt.xlim([0, 72])
+            pdf.savefig(); plt.close()
+            fig, ax = plt.subplots(3,3, figsize=(25,21),dpi = 50)
+            fig.suptitle('Left Start'+'_'+str(df['animal'].unique()), size = 20)
+
+
+
+
+            for clusters, cluster_name in enumerate(df['obstacle_cluster'].unique()):
+                x=df.loc[df['obstacle_cluster']==cluster_name]
+                for i, row in x.iterrows():
+                    if row['odd'] == 'right':
+                        plt.subplot(3,2,cluster_name+1)
+                        plt.gca().set_aspect('equal', adjustable='box')
+                        plt.gca().set_title(str(row['obstacle_cluster']))
+
+                        plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                            [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='red')
+
+
+                        plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                            [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+
+
+
+
+                        plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                        plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                        plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                        sns.scatterplot(x=row['ts_nose_x_cm'],y=row['ts_nose_y_cm'],hue = enumerate(row['ts_nose_x_cm']), palette ='magma',legend=False, s = 7) 
+                        #plt.scatter(row['wobstacle_x_cm'], row['wobstacle_y_cm'], c = list(mcolors.TABLEAU_COLORS)[ row['obstacle_cluster']])
+                        plt.ylim([52,0]); plt.xlim([0, 72])
+            pdf.savefig(); plt.close()
+            pdf.close()
 
 
     ##plot headangle by cluster
-    def plot_headangle(self,savepath,filename):
-        pdf = PdfPages(os.path.join(savepath,(filename) + '_figs.pdf'))
-        for cluster_num,cluster in enumerate(self.df['obstacle_cluster'].unique()):
-            #fig, ax = plt.subplots(,5, figsize=(25,21),dpi = 50)
-            x = self.df.loc[self.df['obstacle_cluster']==cluster]
-            x = x.reset_index()
-            y = nearestX_roundup(len(x),4)
-            fig, ax = plt.subplots(int((y/4)),4, figsize=(25,len(x)),dpi = 100)
-            fig.suptitle(str(x['obstacle_cluster'].unique()) + '_' +str(x['animal'].unique()) , size = 20)
-            for ind,row in x.iterrows():
-                plt.subplot(int((y/4)),4,ind+1)
-                plt.gca().set_aspect('equal', adjustable='box')
-                plt.gca().set_title(str(row['odd'])+str(ind))
-                for indx,i in enumerate(row['head_angle']):
-                    current_ang = i
-                    x1 = row['ts_nose_x_cm'][indx]
-                    y1 = row['ts_nose_y_cm'][indx]
-                    x2 = x1+3 * np.cos(current_ang)
-                    y2 = y1+3* np.sin(current_ang)
-                    plt.plot((x1,x2), (y1,y2), '-',color = 'black',alpha=0.3)
-                plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
-                        [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='orange')
+    def plot_headangle(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            df = animal_frame
+            savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+            pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date)) + '_' + str(pd.unique(df.animal).item()))+ 'head_angle.pdf'))
+
+        
+            for cluster_num,cluster in enumerate(df['obstacle_cluster'].unique()):
+                #fig, ax = plt.subplots(,5, figsize=(25,21),dpi = 50)
+                x = df.loc[df['obstacle_cluster']==cluster]
+                x = x.reset_index()
+                y = nearestX_roundup(len(x),4)
+                fig, ax = plt.subplots(int((y/4)),4, figsize=(25,len(x)),dpi = 100)
+                fig.suptitle(str(x['obstacle_cluster'].unique()) + '_' +str(x['animal'].unique()) , size = 20)
+                for ind,row in x.iterrows():
+                    plt.subplot(int((y/4)),4,ind+1)
+                    plt.gca().set_aspect('equal', adjustable='box')
+                    plt.gca().set_title(str(row['odd'])+str(ind))
+                    for indx,i in enumerate(row['head_angle']):
+                        current_ang = i
+                        x1 = row['ts_nose_x_cm'][indx]
+                        y1 = row['ts_nose_y_cm'][indx]
+                        x2 = x1+3 * np.cos(current_ang)
+                        y2 = y1+3* np.sin(current_ang)
+                        plt.plot((x1,x2), (y1,y2), '-',color = 'black',alpha=0.3)
+                    plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                            [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='orange')
 
 
-                plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
-                        [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+                    plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                            [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
 
-                sns.scatterplot(x=row['obstacle_intersect_nose_x'],y=row['obstacle_intersect_nose_y'],hue = row['obstacle_intersect_nose_x'], palette ='magma',legend=False)    
-                plt.scatter(row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'],color = 'blue')
-                plt.scatter(row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'],color = 'red')
-                plt.scatter(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'],color = 'orange')
-                plt.scatter(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'],color = 'green')
-                plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
-                plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
-                plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
-                plt.ylim([52,0]); plt.xlim([0, 72])
-            pdf.savefig(); plt.close()
-        pdf.close()
+                    sns.scatterplot(x=row['obstacle_intersect_nose_x'],y=row['obstacle_intersect_nose_y'],hue = row['obstacle_intersect_nose_x'], palette ='magma',legend=False)    
+                    plt.scatter(row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'],color = 'blue')
+                    plt.scatter(row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'],color = 'red')
+                    plt.scatter(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'],color = 'orange')
+                    plt.scatter(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'],color = 'green')
+                    plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                    plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                    plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                    plt.ylim([52,0]); plt.xlim([0, 72])
+                pdf.savefig(); plt.close()
+            pdf.close()
+
+    def plot_single_trial(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+             by_date = animal_frame.groupby(['date'])
+             for date,date_frame in by_date:
+                df = date_frame
+
+                savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+                pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date)) + '_' + str(pd.unique(df.animal).item()))+ 'single_trial.pdf'))
+
+
+                for cluster_num,cluster in enumerate(df['obstacle_cluster'].unique()):
+                    #fig, ax = plt.subplots(,5, figsize=(25,21),dpi = 50)
+                    x = df.loc[df['obstacle_cluster']==cluster]
+                    x = x.reset_index()
+                    y = nearestX_roundup(len(x),4)
+                    fig, ax = plt.subplots(int((y/4)),4, figsize=(25,len(x)),dpi = 100)
+                    fig.suptitle(str(x['obstacle_cluster'].unique()) + '_' +str(x['animal'].unique()) , size = 20)
+                    for ind,row in x.iterrows():
+                        plt.subplot(int((y/4)),4,ind+1)
+                        plt.gca().set_aspect('equal', adjustable='box')
+                        plt.gca().set_title(str(row['odd'])+str(ind))
+                        plt.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'])
+                        plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                                [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='orange')
+
+
+                        plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                                [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+
+                        #sns.scatterplot(x=row['obstacle_intersect_nose_x'],y=row['obstacle_intersect_nose_y'],hue = row['obstacle_intersect_nose_x'], palette ='magma',legend=False)    
+                        plt.scatter(row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'],color = 'blue')
+                        plt.scatter(row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'],color = 'red')
+                        plt.scatter(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'],color = 'orange')
+                        plt.scatter(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'],color = 'green')
+                        plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                        plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                        plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                        plt.ylim([52,0]); plt.xlim([0, 72])
+                    pdf.savefig(); plt.close()
+                pdf.close()
 
 
     def intersect_histogram(self,savepath,filename,intersectpart):
-        pdf = PdfPages(os.path.join(savepath,(filename) + '_figs.pdf'))
-        for cluster_num,cluster in enumerate(self.df['obstacle_cluster'].unique()):
-            #fig, ax = plt.subplots(,5, figsize=(25,21),dpi = 50)
-            x = self.df.loc[self.df['obstacle_cluster']==cluster]
-            x = x.reset_index()
-            y = nearestX_roundup(len(x),4)
-            fig, ax = plt.subplots(int((y/4)),4, figsize=(25,len(x)),dpi = 100)
-            fig.suptitle(str(x['obstacle_cluster'].unique()) + '_' +str(x['animal'].unique()) , size = 20)
-            for ind,row in x.iterrows():
-                plt.subplot(int((y/4)),4,ind+1)
-                #plt.gca().set_aspect('equal', adjustable='box')
-                plt.gca().set_title(str(row['odd']) + str(ind))
-                plt.hist((row[intersectpart] -  row['obstacle_edge_mid_y_cm']) )
-                plt.xlim(8,-8)
+        savepath = "D:/obstacle_avoidance/recordings"
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            df = animal_frame
+            savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+            pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date)) + '_' + str(pd.unique(df.animal).item()))+ '_intersect_histogram.pdf'))
+            for cluster_num,cluster in enumerate(df['obstacle_cluster'].unique()):
+                #fig, ax = plt.subplots(,5, figsize=(25,21),dpi = 50)
+                x = df.loc[df['obstacle_cluster']==cluster]
+                x = x.reset_index()
+                y = nearestX_roundup(len(x),4)
+                fig, ax = plt.subplots(int((y/4)),4, figsize=(25,len(x)),dpi = 100)
+                fig.suptitle(str(x['obstacle_cluster'].unique()) + '_' +str(x['animal'].unique()) , size = 20)
+                for ind,row in x.iterrows():
+                    plt.subplot(int((y/4)),4,ind+1)
+                    #plt.gca().set_aspect('equal', adjustable='box')
+                    plt.gca().set_title(str(row['odd']) + str(ind))
+                    plt.hist((row[intersectpart] -  row['obstacle_edge_mid_y_cm']) )
+                    plt.xlim(8,-8)
 
-            pdf.savefig(); plt.close()
-        pdf.close()
+                pdf.savefig(); plt.close()
+            pdf.close()
 
 
-       
+
+#Summary Figure Single Day 
+## set pdf 
+# common save path
+    def train_day_summary(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+    # analyze by each animal and date 
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            by_date = animal_frame.groupby(['date'])
+            for date, date_frame in by_date:
+                df = date_frame
+                #df = df.reset_index()
+                # set up pdf page
+                savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+                pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date).item()) + '_' + str(pd.unique(df.animal).item()))+ '_summary.pdf'))
+
+                fig = plt.figure(constrained_layout=False, figsize=(15, 15),dpi=90)
+                spec2 = gridspec.GridSpec(ncols=2, nrows=4, figure=fig)
+                plt.suptitle(str(pd.unique(df.animal)) + " " + str(pd.unique(df.date) ) + " " + str(len(df)))
+                ax1 = fig.add_subplot(spec2[0,0])
+                ax2 = fig.add_subplot(spec2[0,1])
+                ax3 = fig.add_subplot(spec2[1,0])
+                ax4 = fig.add_subplot(spec2[1,1])
+                ax5 = fig.add_subplot(spec2[2,0])
+                ax6 = fig.add_subplot(spec2[2,1])
+                ax7 = fig.add_subplot(spec2[3,0])
+                ax8 = fig.add_subplot(spec2[3,1])
+
+
+                ##left and right trajectories
+
+                right,left = df[df['odd']=='right'],df[df['odd']=='left']
+                right = right.loc[right['dist']<70]
+                left = left.loc[left['dist']<70]
+                right_nose_x,right_nose_y=right['ts_nose_x_cm'].to_numpy(), right['ts_nose_y_cm'].to_numpy() 
+                left_nose_x,left_nose_y=left['ts_nose_x_cm'].to_numpy(), left['ts_nose_y_cm'].to_numpy() 
+
+
+
+                arena_x = pd.unique(df[['arenaTL_x_cm',
+                'arenaTR_x_cm','arenaBR_x_cm',
+                'arenaBL_x_cm',
+                'arenaTL_x_cm']].values.ravel('K'))
+
+                arena_y = pd.unique(df[['arenaTL_y_cm',
+                'arenaTR_y_cm','arenaBR_y_cm',
+                'arenaBL_y_cm',
+                'arenaTL_y_cm']].values.ravel('K'))
+
+                left_port =  pd.unique(df[['leftportT_x_cm','leftportT_y_cm']].values.ravel('K'))
+
+                right_port = pd.unique(df[['rightportT_x_cm','rightportT_y_cm']].values.ravel('K'))
+
+
+                for ind in range(len(right)):
+                    ax1.plot(right_nose_x[ind],right_nose_y[ind])
+                ax1.set_ylim([51,0]); ax1.set_xlim([0, 71])
+                ax1.title.set_text('Right Trials'+' '+ str(len(right)))
+
+                ax1.plot([arena_x[0],arena_x[1],arena_x[2],arena_x[3],arena_x[0]],
+                          [arena_y[0],arena_y[1],arena_y[2],arena_y[3],arena_y[0]],c='k')
+
+                ax1.scatter(left_port[0],left_port[1],c='purple',s=200,marker = 's')
+                ax1.scatter(right_port[0],right_port[1],c='r',s=200,marker = 's')
+
+                for ind in range(len(left)):
+                    ax2.plot(left_nose_x[ind],left_nose_y[ind])
+                ax2.set_ylim([51,0]); ax2.set_xlim([0, 71])
+                ax2.title.set_text('Left Trials'+' '+ str(len(left)))
+                ax2.plot([arena_x[0],arena_x[1],arena_x[2],arena_x[3],arena_x[0]],
+                          [arena_y[0],arena_y[1],arena_y[2],arena_y[3],arena_y[0]],c='k')
+
+                ax2.scatter(left_port[0],left_port[1],c='purple',s=200,marker = 's')
+                ax2.scatter(right_port[0],right_port[1],c='r',s=200,marker = 's')
+
+
+
+                ## Trial time 
+                #histogram
+                ax3.hist(df['time'])
+                ax3.set_xlabel('Time(sec)')
+                ax3.set_ylabel('count')
+                ax3.title.set_text('Trial Time Histogram')
+
+                ax4.plot(range(len(df)),df['time'],'-o')
+                ax4.set_xlabel('Trial Number')
+                ax4.set_ylabel('Time(sec)')
+                ax4.axline((0,df['time'].mean()),slope=0)
+                ax4.legend(title ='Mean Trial Time(sec) ' + str(np.round(df['time'].mean())))
+                ax4.title.set_text('Time per Trial')
+                ## Trial distance
+
+                ax5.hist(df['dist'])
+                ax5.set_xlabel('Distance(cm)')
+                ax5.set_ylabel('count')
+                ax5.title.set_text('Trial Distance Histogram')
+
+                ax6.plot(range(len(df)),df['dist'],'-o')
+                ax6.set_xlabel('Trial Number')
+                ax6.set_ylabel('Distance(cm)')
+                ax6.axline((0,df['dist'].mean()),slope=0)
+                ax6.legend(title ='Mean Trial Distance(cm) ' + str(np.round(df['dist'].mean())))
+                ax6.title.set_text('Distance per Trial')
+
+                ## angle to port
+
+                #right starting 
+                ax7.hist(np.mean(right['resample_angle_to_leftport']),color='b',label='leftport')
+                ax7.hist(np.mean(right['resample_angle_to_rightport']),color = 'r',label='rightport')
+                ax7.legend()
+                ax7.set_xlim(0,180)
+                ax7.title.set_text('Right Trials')
+
+                #left starting 
+                ax8.hist(np.mean(left['resample_angle_to_leftport']),color='b',label='leftport')
+                ax8.hist(np.mean(left['resample_angle_to_rightport']),color = 'r',label='rightport')
+                ax8.legend()
+                ax8.set_xlim(0,180)
+                ax8.title.set_text('Left Trials')
+
+                pdf.savefig(); plt.close()
+                pdf.close()
+
+
+    def plot_consecutive_trials_singleday(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        # analyze by each animal and date 
+        by_animal = self.df.groupby(['animal'])
+        for animal,animal_frame in by_animal:
+            by_date = animal_frame.groupby(['date'])
+            for date, date_frame in by_date:
+                df = date_frame
+                df = df.reset_index()
+                savepath_session = os.path.join(*[savepath,str(pd.unique(df.date).item()),str(pd.unique(df.animal).item()),str(pd.unique(df.task).item())])
+                con_df = pd.DataFrame()
+                obstacle_cluster_list = df['obstacle_cluster']
+                con_list = find_consecutive_repeats(obstacle_cluster_list)
+
+                for i in range(len(con_list)):
+                    con_df = con_df.append(df.loc[con_list[i][0]:con_list[i][1]])
+                con_df = con_df.reset_index()
+                row_num = nearestX_roundup(len(con_df),3)/3
+                fig, ax = plt.subplots(int(row_num),3, figsize=(15,int(len(con_df))),dpi = 90)
+                pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(df.date).item()) + '_' + str(pd.unique(df.animal).item()))+ '_consective_trials.pdf')) 
+                fig.suptitle(str(con_df['animal'].unique()) + '_' +str(con_df['date'].unique()) , size = 20)
+                fig.tight_layout()
+                plt.subplots_adjust(top=0.95)
+                for ind,row in con_df.iterrows():
+                    plt.subplot(int(row_num),3,ind+1)
+                    plt.gca().set_aspect('equal', adjustable='datalim')
+                    plt.gca().set_title(str(row['odd'])+str(row['obstacle_cluster']))
+                    plt.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'])
+                    plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
+                            [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='orange')
+                    plt.plot([row['gt_obstacleTL_x_cm'], row['gt_obstacleTR_x_cm'], row['gt_obstacleBR_x_cm'], row['gt_obstacleBL_x_cm'],row['gt_obstacleTL_x_cm']],
+                            [row['gt_obstacleTL_y_cm'], row['gt_obstacleTR_y_cm'], row['gt_obstacleBR_y_cm'], row['gt_obstacleBL_y_cm'],row['gt_obstacleTL_y_cm']],color='green')
+                    #sns.scatterplot(x=row['obstacle_intersect_nose_x'],y=row['obstacle_intersect_nose_y'],hue = row['obstacle_intersect_nose_x'], palette ='magma',legend=False)    
+                    #plt.scatter(row['gt_obstacleTL_x_cm'],row['gt_obstacleTL_y_cm'],color = 'blue')
+                    #plt.scatter(row['gt_obstacleTR_x_cm'],row['gt_obstacleTR_y_cm'],color = 'red')
+                    #plt.scatter(row['gt_obstacleBL_x_cm'],row['gt_obstacleBL_y_cm'],color = 'orange')
+                    #plt.scatter(row['gt_obstacleBR_x_cm'],row['gt_obstacleBR_y_cm'],color = 'green')
+                    #plt.scatter(row['gt_obstacle_cen_x_cm'],row['gt_obstacle_cen_y_cm'],color='blue')
+                    plt.scatter(row['leftportT_x_cm'],row['leftportT_y_cm'],color='blue')
+                    plt.scatter(row['rightportT_x_cm'],row['rightportT_y_cm'],color='black')
+                    plt.ylim([52,0]); plt.xlim([0, 72])
+                pdf.savefig(); plt.close()
+                pdf.close()

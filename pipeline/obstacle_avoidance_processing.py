@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from scipy.interpolate import interp1d
+from scipy import signal
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.cluster import KMeans
@@ -13,6 +14,7 @@ import matplotlib.colors as mcolors
 import glob
 import h5py
 from astropy.convolution import interpolate_replace_nans
+from scipy.ndimage import gaussian_filter1d
 
 
 import sys
@@ -24,7 +26,8 @@ from src.base import BaseInput
 from src.topcam import Topcam
 from src.utils.auxiliary import flatten_series, find_index_in_list
 from src.utils.path import find
-from utils.base_functions import format_frames,flatten_column,list_columns
+from utils.base_functions import *
+from plots.plots import plot_oa
 
 
 ## create avoidance session object 
@@ -239,7 +242,7 @@ class AvoidanceSession(BaseInput):
         print('df made')
         
         self.data = df1
-        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         
 
@@ -311,6 +314,8 @@ class AvoidanceSession(BaseInput):
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
+        
+
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
         for ind,row in self.data.iterrows():
             nose_points = row['nose_x_cm'].astype(float)
@@ -322,36 +327,37 @@ class AvoidanceSession(BaseInput):
 
         
 
-        ## take median of arena points
-        arena_cols = [col for col in self.data.columns if 'arena' in col]
-        arena_cols =[col for col in arena_cols if 'likelihood' not in col]
-        for col in arena_cols:
-            for ind,row in self.data.iterrows():
-                self.data.at[ind,col] = np.mean(row[col])
-        print('arena_median')
-
-        ## take median of ports
-        port_list =list_columns(self.data,['leftportT','rightportT'])
-        port_list = [i for i in port_list if 'cm' in i]
-        for pos in port_list:
-            for ind,row in self.data.iterrows():
-                self.data.at[ind,pos] = np.mean(row[pos])
-        print('ports_median')
 
         ## mean port and arena
         port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
         port_arena_list = [i for i in port_arena_list if 'cm' in i]
         for pos in port_arena_list:
-           self.data['mean_'+pos] = self.data[pos].mean()
+           for ind,row in self.data.iterrows():
+                self.data.at[ind,pos] = np.mean(row[pos])
+
+        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
+        port_arena_list = [i for i in port_arena_list if 'cm' in i]
+        for pos in port_arena_list:
+           self.data[pos] = self.data[pos].mean()
+           
         print('mean')
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
         keys_list= [col for col in keys_list if 'lind' not in col]
         for ind, row in self.data.iterrows(): 
+            """interpolate and smooth key points
+                interpolate across nans 
+                gausian smooth sigma 3 """
+            for key in keys_list:
+                interp_smooth = gaussian_filter1d(interp(row[key]),3)
+                self.data.at[ind,key] = interp_smooth.astype(float)
+            
+
+
             if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>16)
+                odd_ind = np.argmax(nose_list>10)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
@@ -363,9 +369,49 @@ class AvoidanceSession(BaseInput):
                 even_ind = np.argmax(nose_list<50)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
-        print('gt')
+        print('trial_start_smooth')
+        for ind,row in self.data.iterrows(): 
+            dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
+            self.data.at[ind,'dist'] = dist
+        print('dist')
+        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        for ind,row in self.data.iterrows():
+            angle_to_rightport = []
+            angle_to_leftport = []
+            rightport = [row['rightportT_x_cm'],row['rightportT_y_cm']]
+            leftport = [row['leftportT_x_cm'],row['leftportT_y_cm']]
+            for indx in range(len(row['ts_nose_x_cm'])):
+                center = [np.mean([row['ts_rightear_x_cm'][indx],row['ts_leftear_x_cm'][indx]]),np.mean([row['ts_rightear_y_cm'][indx],row['ts_leftear_y_cm'][indx]])]
+                nose_points = [row['ts_nose_x_cm'][indx],row['ts_nose_y_cm'][indx]]
+                angleright = calculate_angle(center, nose_points, rightport)
+                angleleft = calculate_angle(center, nose_points, leftport)
+                angle_to_rightport.append(angleright)
+                angle_to_leftport.append(angleleft)
+            self.data.at[ind,'angle_to_rightport'] = np.array(angle_to_rightport).astype(object)
+            self.data.at[ind,'angle_to_leftport'] = np.array(angle_to_leftport).astype(object)
+
+        right_left = ['angle_to_leftport','angle_to_rightport','ts_nose_x_cm','ts_nose_y_cm']
+        for ind,row in self.data.iterrows():
+            for direction in right_left:
+                interp = pd.Series(row[direction].astype(float)).interpolate().values
+                resample = signal.resample(interp[~np.isnan(interp)],200)
+                self.data.at[ind,'resample_'+ direction] = resample.astype(object)
+        print('angle_to_port')
+        
+
+        
+
         self.data['time'] = self.data['len']/60
-        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path,('non_obstacle' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        session = plot_oa('empty',self.data)
+        session.train_day_summary()
+        #train_day_summary_df(self.data)
+        print('summary_plot')
+
+
+        self.data.to_hdf(os.path.join(self.session_path,('non_obstacle' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        print('saved_df')
+
 
 
     def pillar_avoidance(self):
@@ -381,47 +427,35 @@ class AvoidanceSession(BaseInput):
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
-        #self.data.to_hdf(os.path.join(self.session_path, ('df_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+  
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
+    
         for ind,row in self.data.iterrows():
             nose_points = row['nose_x_cm'].astype(float)
             nose_points = nose_points[~np.isnan(nose_points)]
             if np.nanmean(nose_points[:10])<= 20:
-                self.data.at[ind,'odd'] = True
+                self.data.at[ind,'odd'] = 'left'
             elif np.nanmean(nose_points[:10]) >=20:
-                self.data.at[ind,'odd'] = False
-           # if np.nanmean(row['nose_x_cm'][:10]) <= 20:
-            #    self.data.at[ind,'odd'] = True 
-            #elif np.nanmean(row['nose_x_cm'][:10]) >=20:
-             #   self.data.at[ind,'odd'] = False
+                self.data.at[ind,'odd'] = 'right'
+        print('odd_even')
 
         
 
-        ## take median of arena points
-        arena_cols = [col for col in self.data.columns if 'arena' in col]
-        arena_cols =[col for col in arena_cols if 'likelihood' not in col]
-        for col in arena_cols:
-            for ind,row in self.data.iterrows():
-                self.data.at[ind,col] = np.mean(row[col])
-        print('arena_median')
+      
 
-        ## take median of ports
-        port_list =list_columns(self.data,['leftportT','rightportT'])
-        port_list = [i for i in port_list if 'cm' in i]
-        for pos in port_list:
-            for ind,row in self.data.iterrows():
-                self.data.at[ind,pos] = np.mean(row[pos])
-        print('ports_median')
-
-        ## mean port and arena
+      ## mean port and arena
         port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
         port_arena_list = [i for i in port_arena_list if 'cm' in i]
         for pos in port_arena_list:
-           self.data['mean_'+pos] = self.data[pos].mean()
-        print('mean')
-        
-        self.data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+           for ind,row in self.data.iterrows():
+                self.data.at[ind,pos] = np.mean(row[pos])
+
+        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
+        port_arena_list = [i for i in port_arena_list if 'cm' in i]
+        for pos in port_arena_list:
+           self.data[pos] = self.data[pos].mean()
+           
 
 
         
@@ -438,9 +472,12 @@ class AvoidanceSession(BaseInput):
         #trail start = ts
         ##odd tiral at 16 cm even at 56 cm     
         for ind, row in self.data.iterrows(): 
-            if row['odd'] == True:
+            """interpolate and smooth key points
+                interpolate across nans 
+                gausian smooth sigma 3 """
+            if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>16)
+                odd_ind = np.argmax(nose_list>10)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
@@ -452,9 +489,29 @@ class AvoidanceSession(BaseInput):
                 even_ind = np.argmax(nose_list<50)
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
-        print('odd_even')
-        self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        print('test')
+        print('trial_start')
+
+        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        keys_list = list_columns(self.data,keys)
+        keys_list= [col for col in keys_list if 'likelihood' not in col]
+        keys_list= [col for col in keys_list if 'ts_'  in col]
+        for ind, row in self.data.iterrows(): 
+            """interpolate and smooth key points
+                interpolate across nans 
+                gausian smooth sigma 3 """
+            for key in keys_list:
+                interp_smooth = gaussian_filter1d(interpolate_array(row[key]),3)
+                #resample = signal.resample(interp_smooth[~np.isnan(interp_smooth)],200)
+                self.data.at[ind, key] = interp_smooth.astype(object)
+        print('smooth_ts')
+
+        for ind,row in self.data.iterrows(): 
+            dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
+            self.data.at[ind,'dist'] = dist
+        self.data = self.data.loc[self.data['dist']<70]
+        print('dist')
+        
+        #self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         ##  median point at gt obstacle 
         obstacle_cols = list_columns(self.data,['obstacle'])
@@ -490,7 +547,17 @@ class AvoidanceSession(BaseInput):
 
         # drop any transits that were really slow (only drop slowest 10% of transits)
         time_thresh = self.data['len'].quantile(0.9)
+        self.data['time'] = self.data['len']/60
         self.data = self.data[self.data['len']<time_thresh]
+        session = plot_oa('empty',self.data)
+        session.cluster(6)
+        session.plot_trace_cluster_single_animal()
+        print('cluster')
+        session.plot_single_trial()
+        print('single_trial')
+        session.plot_consecutive_trials_singleday()
+        print('consecutive_trials')
+        self.data = session.df
         self.raw_data =  self.data
         self.processed_data =  self.data.drop(self.data.filter(regex='likelihood').columns,axis = 1)
         print('saving' + self.session_name + 'raw')

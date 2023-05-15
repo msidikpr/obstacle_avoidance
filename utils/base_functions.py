@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import itertools 
 from tqdm import tqdm
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 
 
@@ -99,3 +102,89 @@ def nearestX_roundup(num, x):
 
 def midpoint(x1, y1, x2, y2):
     return ((x1 + x2)/2, (y1 + y2)/2)
+
+def calculate_angle(p1, p2, p3):
+    """
+    Calculates the angle made by connecting three points.
+    Assumes that p1 is the vertex of the angle.
+    """
+    x1, y1 = p1
+    x2, y2 = p2
+    x3, y3 = p3
+    
+    # Calculate the vectors
+    v1 = (x2 - x1, y2 - y1)
+    v2 = (x3 - x1, y3 - y1)
+    
+    # Calculate the dot product
+    dot_product = v1[0] * v2[0] + v1[1] * v2[1]
+    
+    # Calculate the magnitudes of the vectors
+    v1_mag = math.sqrt(v1[0] ** 2 + v1[1] ** 2)
+    v2_mag = math.sqrt(v2[0] ** 2 + v2[1] ** 2)
+    
+    # Calculate the angle (in radians) using the dot product and vector magnitudes
+    angle = math.acos(dot_product / (v1_mag * v2_mag))
+    
+    # Convert the angle to degrees and return it
+    return math.degrees(angle)
+
+
+def find_consecutive_repeats(series):
+
+    """
+    finds consective repeats in a pd.series
+    Used to find trials that have repeat of the same  obstacle location
+    """
+    consecutive_repeats = []
+    count = 1
+    prev_value = None
+
+    for index, value in series.iteritems():
+        if value == prev_value:
+            count += 1
+        else:
+            if count > 3:
+                count = 1
+                prev_value = value
+            
+            count = 1
+            prev_value = value
+
+        if count == 3:
+            consecutive_repeats.append((index - count+1, index, value,count))
+    
+ 
+    for count,row in enumerate(consecutive_repeats):
+        if consecutive_repeats[count][-1] != 3:
+            del consecutive_repeats[count]
+    
+
+    return consecutive_repeats
+
+def nan_helper(y):
+    """Helper to handle indices and logical indices of NaNs.
+
+    Input:
+        - y, 1d numpy array with possible NaNs
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+          to convert logical indices of NaNs to 'equivalent' indices
+    Example:
+        #>>> # linear interpolation of NaNs
+        #>>> nans, x= nan_helper(y)
+        #>>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+    """
+    y=y.astype(float)
+
+    return np.isnan(y), lambda z: z.nonzero()[0]
+
+
+def interpolate_array(array):
+    """takes in np array to interp across nans"""
+    nans, x= nan_helper(array)
+    array[nans]= np.interp(x(nans), x(~nans), array[~nans].astype(float))
+
+    return array.astype(float)
+
