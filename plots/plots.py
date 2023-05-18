@@ -47,7 +47,7 @@ class plot_oa(BaseInput):
         self.df = df 
         
     ## append df's together
-    def gather_session_df(self,tasktype):
+    def gather_session_df(self,tasktype,numcluster):
         # list data path files
         data_path = Path(self.path).expanduser()
         # find date
@@ -69,8 +69,28 @@ class plot_oa(BaseInput):
         hf_list = list(itertools.chain(*hf_list))
         for h5 in hf_list:
             data = pd.read_hdf(h5)
-            df=df.append(data,ignore_index=True)
+            df=df.append(data,ignore_index=False)
         self.df=df
+        self.df['orginal_index'] = self.df.index
+        self.df =self.df.reset_index()
+        self.cluster(numcluster)
+
+        """get average obstacle postition"""
+        keys = list_columns(self.df,['gt'])
+        keys = [key for key in keys if 'cen' not in key]
+        for cluster,cluster_frame in self.df.groupby('obstacle_cluster'):
+            for key in keys:
+                self.df.loc[self.df.obstacle_cluster ==cluster,key] = cluster_frame[key].mean()
+        
+
+        """get average areana and port postition """
+        keys = list_columns(self.df,['arena','port'])
+        keys = [i for i in keys if 'cm' in i]
+        keys = [i for i in keys if 'portB' not in i]
+        keys
+        for key in keys:
+            self.df[key] = self.df[key].mean()
+        
     ##cluster obstacle positions
     def cluster(self,numcluster):
         self.df = self.df[self.df['gt_obstacle_cen_x_cm'].notna()]
@@ -356,6 +376,16 @@ class plot_oa(BaseInput):
                 interp = pd.Series(row[direction].astype(float)).interpolate().values
                 resample = signal.resample(interp,200)
                 self.df.at[ind,'resample_'+ direction] = resample.astype(object)
+
+    def create_consective_df(self):
+        con_df = pd.DataFrame()
+        df = self.df.reset_index(drop=True)
+        for animal,animal_frame in df.groupby('animal'):
+            for date, date_frame in animal_frame.groupby('date'):
+                repeats_list = find_consecutive_repeats(date_frame['obstacle_cluster'])
+                for i in range(len(repeats_list)):
+                    con_df = con_df.append(date_frame.loc[repeats_list[i][0]:repeats_list[i][1]])
+        self.con_df = con_df
         
 
 

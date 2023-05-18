@@ -445,7 +445,7 @@ class AvoidanceSession(BaseInput):
       
 
       ## mean port and arena
-        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
+        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT']) ## add left right port B and
         port_arena_list = [i for i in port_arena_list if 'cm' in i]
         for pos in port_arena_list:
            for ind,row in self.data.iterrows():
