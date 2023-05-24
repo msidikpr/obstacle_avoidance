@@ -16,6 +16,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 import os, fnmatch
+from random import sample
+
 
 import sys
 sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
@@ -78,10 +80,16 @@ class plot_oa(BaseInput):
         """get average obstacle postition"""
         keys = list_columns(self.df,['gt'])
         keys = [key for key in keys if 'cen' not in key]
+        
+        for key in keys:
+            self.df['mean_'+key] = np.nan
         for cluster,cluster_frame in self.df.groupby('obstacle_cluster'):
             for key in keys:
-                self.df.loc[self.df.obstacle_cluster ==cluster,key] = cluster_frame[key].mean()
+                mean_obstacle = cluster_frame[key].mean()
+    
+                self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
         
+                #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
 
         """get average areana and port postition """
         keys = list_columns(self.df,['arena','port'])
@@ -89,7 +97,97 @@ class plot_oa(BaseInput):
         keys = [i for i in keys if 'portB' not in i]
         keys
         for key in keys:
+            for ind,row in self.df.iterrows():
+                    self.df.at[ind,key] = np.mean(row[key])
+        for key in keys:
             self.df[key] = self.df[key].mean()
+
+       
+
+       
+        """calculate the nose x interp
+        interp nose x is interpolation across the same time basis of 50 bins"""
+        fake_time = np.linspace(0,1,50)
+        for ind, row in self.df.iterrows():
+            xT = np.linspace(0,1,len(row['ts_nose_x_cm']))
+            yT = np.linspace(0,1,len(row['ts_nose_y_cm']))
+            intx = interp1d(xT, row['ts_nose_x_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
+            inty = interp1d(yT, row['ts_nose_y_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
+            
+            self.df.at[ind,'interp_ts_nose_x_cm'] = intx.astype(object)
+            self.df.at[ind,'interp_ts_nose_y_cm'] = inty.astype(object)
+        #print(len(self.df))
+
+        """labe top or bottom start"""
+        labels = ['top','bottom']
+        top_bottom = split_range_into_parts(pd.unique(self.df.arenaTL_y_cm).item(),pd.unique(self.df.arenaBL_y_cm).item(),2)
+        top_bottom_dict = dict(zip(labels,top_bottom))
+        for ind, row in self.df.iterrows():
+            if top_bottom_dict.get('top')[0]<= np.nanmean(row['interp_ts_nose_y_cm'][:5]) <= top_bottom_dict.get('top')[1]:
+                self.df.at[ind,'start'] = 'top'
+            if top_bottom_dict.get('bottom')[0]<= np.nanmean(row['interp_ts_nose_y_cm'][:5]) <= top_bottom_dict.get('bottom')[1]:
+                self.df.at[ind,'start'] = 'bottom'
+            if np.nanmean(row['interp_ts_nose_y_cm'][:5]) == np.nan:
+                self.df.drop(df.iloc[ind])
+        print(len(self.df))
+
+
+        """get the average of nose x given the same start, obstalce and direction"""
+        for direction, direction_frame in self.df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                for start, start_frame in cluster_frame.groupby(['start']):
+                    array = np.zeros([len(start_frame), 50])
+                    count = 0
+                    for ind,row in start_frame.iterrows():
+                        array[count,:] = row['interp_ts_nose_x_cm']
+                        count += 1
+                    mean_trace = np.nanmean(array,axis = 0)
+                    x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
+                    for ind,row in x.iterrows():
+                        self.df.at[ind,'mean_interp_ts_nose_x_cm']= mean_trace.astype(object)
+        #print(self.df['mean_interp_ts_nose_x_cm'].isna().sum())
+
+        self.df = self.df[self.df['mean_interp_ts_nose_x_cm'].notna()]
+        print(len(self.df))
+        
+        """Calculate interp y which is interpolation of nose_x vs nose_y then ploted against the mean_interp_noseX """
+        for ind,row in self.df.iterrows():
+
+            interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value="extrapolate")
+            interp_y = interp(row['mean_interp_ts_nose_x_cm'].astype(float))
+            interp_y = interpolate_array(interp_y)
+            self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+
+        
+       
+      
+
+        for direction, direction_frame in self.df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                for start, start_frame in cluster_frame.groupby(['start']):
+                    array = np.zeros([len(start_frame), 50])
+                    count = 0
+                    for ind,row in start_frame.iterrows():
+                        array[count,:] = row['interp_ts_nose_y_cm']
+                        count += 1
+                    mean_trace = np.nanmean(array,axis=0)
+                    median_trace = np.nanmedian(array,axis = 0)
+                    x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
+                    for ind,row in x.iterrows():
+                        if cluster in [2,3]:
+                            self.df.at[ind,'mean_interp_ts_nose_y_cm']= median_trace.astype(object)
+                        else:
+                            self.df.at[ind,'mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
+        
+        
+        
+        
+        
+            
+        
+        
+                
+    
         
     ##cluster obstacle positions
     def cluster(self,numcluster):
@@ -832,3 +930,156 @@ class plot_oa(BaseInput):
                     plt.ylim([52,0]); plt.xlim([0, 72])
                 pdf.savefig(); plt.close()
                 pdf.close()
+
+
+    def plot_consective_trials(self,key,color_pallete):
+        """consecutive plots"""
+
+
+        savepath = "D:/obstacle_avoidance/recordings"
+        savepath_session = os.path.join(*[savepath,'figures'])
+        key = key
+        color_pallete = color_pallete
+        color_map = create_color_dict(self.con_df,key,color_pallete)
+        pdf = PdfPages(os.path.join((savepath_session), 'by_' + str(key)+ '_' 'consecutive.pdf'))
+        for obstacle, obstalce_frame in self.con_df.groupby('obstacle_cluster'):
+
+            df = obstalce_frame
+            df = df.reset_index(drop=True)
+            fig = plt.figure(constrained_layout=False, figsize=(15, 7.5),dpi=90)
+            fig.suptitle('by_' + str(key) + str(pd.unique(df['obstacle_cluster'])))
+            spec2 = gridspec.GridSpec(ncols=3, nrows=2, figure=fig)
+            #panel_1 = gridspec.GridSpecFromSubplotSpec(2,3,subplot_spec=spec2[0])
+
+
+            """Top Row"""
+            ax1 = fig.add_subplot(spec2[0,0])
+            ax1.set_title('right')
+            plot_arena(df,ax1,obstacle=True)
+            ax2 = fig.add_subplot(spec2[0,1])
+            plot_arena(df,ax2,obstacle=True)
+            ax3 = fig.add_subplot(spec2[0,2])
+            plot_arena(df,ax3,obstacle=True)
+
+
+
+            """Bottom Row"""
+            ax4 = fig.add_subplot(spec2[1,0])
+            ax4.set_title('left')
+            plot_arena(df,ax4,obstacle=True)
+            ax5 = fig.add_subplot(spec2[1,1])
+            plot_arena(df,ax5,obstacle=True)
+            ax6 = fig.add_subplot(spec2[1,2])
+            plot_arena(df,ax6,obstacle=True)
+
+
+
+            """Loop through data frame"""
+
+
+            trial_list = list(range(0,len(df),3))
+            trial_list = create_sublists(trial_list)
+            trial_list = sample(trial_list,100)
+            for sublist in trial_list:
+                trial = df.iloc[sublist[0]:sublist[1]]
+                trial = trial.reset_index(drop=True)
+                color = color_map.get(pd.unique(trial[key]).item())
+                if trial.at[0,'odd'] == 'right':
+                    ax1.plot(trial.at[0,'ts_nose_x_cm'],trial.at[0,'ts_nose_y_cm'],c=color)
+                    markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
+                    ax1.legend(markers, color_map.keys(), numpoints=1)
+                    ax2.plot(trial.at[1,'ts_nose_x_cm'],trial.at[1,'ts_nose_y_cm'],c=color)
+                    ax3.plot(trial.at[2,'ts_nose_x_cm'],trial.at[2,'ts_nose_y_cm'],c=color)
+                if trial.at[0,'odd'] == 'left':
+                    ax4.plot(trial.at[0,'ts_nose_x_cm'],trial.at[0,'ts_nose_y_cm'],c=color)
+                    markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
+                    ax4.legend(markers, color_map.keys(), numpoints=1)
+                    ax5.plot(trial.at[1,'ts_nose_x_cm'],trial.at[1,'ts_nose_y_cm'],c=color)
+                    ax6.plot(trial.at[2,'ts_nose_x_cm'],trial.at[2,'ts_nose_y_cm'],c=color)
+            pdf.savefig(); plt.close()
+        pdf.close()
+
+    def obstacle_by_variable(self,key,color_pallete):
+        """Direction by key obstalce trials"""
+
+        savepath = "D:/obstacle_avoidance/recordings"
+        savepath_session = os.path.join(*[savepath,'figures'])
+
+
+        key=key
+        color_pallete = color_pallete
+        color_map = create_color_dict(self.df,key,color_pallete)
+
+        pdf = PdfPages(os.path.join((savepath_session), 'by ' + str(key)+ ' '+ 'and ' +' obstalce.pdf'))
+
+        fig = plt.figure(constrained_layout=False, figsize=(15, 15),dpi=90)
+        fig.suptitle('by ' + key + ' '+ 'and ' +'obstalce ')
+        spec2 = gridspec.GridSpec(ncols=1, nrows=2, figure=fig)
+
+
+        """Right"""
+        panel_1 = gridspec.GridSpecFromSubplotSpec(2,3,subplot_spec=spec2[0])
+        ax1 = fig.add_subplot(panel_1[0,0])
+        plot_arena(self.df,ax1)
+        ax2 = fig.add_subplot(panel_1[0,1])
+        plot_arena(self.df,ax2)
+
+        ax3 = fig.add_subplot(panel_1[0,2])
+        plot_arena(self.df,ax3)
+        ax4 = fig.add_subplot(panel_1[1,0])
+        plot_arena(self.df,ax4)
+        ax5 = fig.add_subplot(panel_1[1,1])
+        plot_arena(self.df,ax5)
+        ax6 = fig.add_subplot(panel_1[1,2])
+        plot_arena(self.df,ax6)
+
+        right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+        markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
+        ax1.legend(markers, color_map.keys(), numpoints=1,title = 'right')
+
+
+        """Left """
+        panel_2 = gridspec.GridSpecFromSubplotSpec(2,3,subplot_spec=spec2[1])
+        ax7 = fig.add_subplot(panel_2[0,0])
+        plot_arena(self.df,ax7)
+        ax8 = fig.add_subplot(panel_2[0,1])
+        plot_arena(self.df,ax8)
+        ax8.set_title('left')
+        ax9 = fig.add_subplot(panel_2[0,2])
+        plot_arena(self.df,ax9)
+        ax10 = fig.add_subplot(panel_2[1,0])
+        plot_arena(self.df,ax10)
+        ax11= fig.add_subplot(panel_2[1,1])
+        plot_arena(self.df,ax11)
+        ax12 = fig.add_subplot(panel_2[1,2])
+        plot_arena(self.df,ax12)
+
+        left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+        markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
+        ax7.legend(markers, color_map.keys(), numpoints=1,title = 'left')
+
+
+
+        """ plot trials"""
+        right_obstacle_dict = dict(zip(pd.unique(self.df['obstacle_cluster'].sort_values().to_list()),right_axs))
+        left_obstacle_dict = dict(zip(pd.unique(self.df['obstacle_cluster'].sort_values().to_list()),left_axs))
+
+        for direction, direction_frame in self.df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                cluster_frame = cluster_frame.sample(50)
+                right_obstacle_axis = right_obstacle_dict.get(cluster)
+                left_obstalce_axis = left_obstacle_dict.get(cluster)
+                plot_obstacle(cluster_frame,right_obstacle_axis,cluster)
+                plot_obstacle(cluster_frame,left_obstalce_axis,cluster)
+                right_obstacle_axis.set_title(str(cluster))
+                left_obstalce_axis.set_title(str(cluster))
+                for ind,row in cluster_frame.iterrows():
+                    color = color_map.get(pd.unique(row[key]).item())
+                    if direction == 'right':
+                        which_axis = right_obstacle_dict.get(cluster)
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],c = color)
+                    if direction == 'left':
+                        which_axis = left_obstacle_dict.get(cluster)
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],c = color)
+        pdf.savefig(); plt.close()
+        pdf.close()
