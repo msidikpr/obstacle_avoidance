@@ -334,3 +334,25 @@ def column_to_array(column,df):
         array[count,:] = row
         count += 1
     return array
+
+
+def get_mean_median_by_variable(df,key): 
+    for key_name,frame in df.groupby([str(key)]):
+        for direction, direction_frame in frame.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                for start, start_frame in cluster_frame.groupby(['start']):
+                    array = np.zeros([len(start_frame), 50])
+                    count = 0
+                    for ind,row in start_frame.iterrows():
+                        array[count,:] = row['interp_ts_nose_y_cm']
+                        count += 1
+                    mean_trace = np.nanmean(array,axis=0)
+                    median_trace = np.nanmedian(array,axis = 0)
+                    x = frame.loc[(frame['obstacle_cluster'] ==cluster) & (frame['start']==start)&(frame['odd'] ==direction)]
+                    for ind,row in x.iterrows():
+
+                        df.at[ind,key+'_''median_interp_ts_nose_y_cm']= median_trace.astype(object)
+
+                        df.at[ind,key+'_''mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
+        
+        

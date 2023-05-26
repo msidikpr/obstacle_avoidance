@@ -508,7 +508,7 @@ class AvoidanceSession(BaseInput):
         for ind,row in self.data.iterrows(): 
             dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
             self.data.at[ind,'dist'] = dist
-        self.data = self.data.loc[self.data['dist']<70]
+        self.data = self.data.loc[self.data['dist']<80]
         print('dist')
         
         #self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
