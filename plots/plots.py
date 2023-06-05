@@ -181,17 +181,9 @@ class plot_oa(BaseInput):
                         self.df.at[ind,'mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
                     
                         self.df.at[ind,'median_interp_ts_nose_y_cm']= median_trace.astype(object)
-        """label early, middle, late"""
-
-        for ind, row in self.df.iterrows():
-            if row['date'] in ['042823','043023','050123']:
-                self.df.at[ind,'exp'] = 'early'
-            if row['date'] in ['050223','050323','050423','050523']:
-                self.df.at[ind,'exp'] = 'mid'
-            if row['date'] in ['050923','051023']:
-                self.df.at[ind,'exp'] = 'late'
         
-        get_mean_median_by_variable(self.df,'exp')
+        
+       
         get_mean_median_by_variable(self.df,'animal')
         get_mean_median_by_variable(self.df,'date')
         
