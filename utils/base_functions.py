@@ -6,6 +6,7 @@ from tqdm import tqdm
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from scipy import stats
 
 import seaborn as sns
 
@@ -348,11 +349,13 @@ def get_mean_median_by_variable(df,key):
                         count += 1
                     mean_trace = np.nanmean(array,axis=0)
                     median_trace = np.nanmedian(array,axis = 0)
+                    std_trace = np.nanstd(array,axis=0)
+                    mad_trace = stats.median_abs_deviation(array,axis = 0,nan_policy='omit')
                     x = frame.loc[(frame['obstacle_cluster'] ==cluster) & (frame['start']==start)&(frame['odd'] ==direction)]
                     for ind,row in x.iterrows():
-
-                        df.at[ind,key+'_''median_interp_ts_nose_y_cm']= median_trace.astype(object)
-
                         df.at[ind,key+'_''mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
+                        df.at[ind,key+'_''median_interp_ts_nose_y_cm']= median_trace.astype(object)
+                        df.at[ind,key+'_''std_interp_ts_nose_y_cm']= std_trace.astype(object)
+                        df.at[ind,key+'_''mad_interp_ts_nose_y_cm']= mad_trace.astype(object)
         
         

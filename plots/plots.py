@@ -11,6 +11,7 @@ from tqdm import tqdm
 import itertools 
 from scipy.interpolate import interp1d
 from scipy import signal
+from scipy import stats
 from sklearn.cluster import KMeans
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.gridspec as gridspec
@@ -75,21 +76,6 @@ class plot_oa(BaseInput):
         self.df=df
         self.df['orginal_index'] = self.df.index
         self.df =self.df.reset_index()
-        self.cluster(numcluster)
-
-        """get average obstacle postition"""
-        keys = list_columns(self.df,['gt'])
-        keys = [key for key in keys if 'cen' not in key]
-        
-        for key in keys:
-            self.df['mean_'+key] = np.nan
-        for cluster,cluster_frame in self.df.groupby('obstacle_cluster'):
-            for key in keys:
-                mean_obstacle = cluster_frame[key].mean()
-    
-                self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
-        
-                #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
 
         """get average areana and port postition """
         keys = list_columns(self.df,['arena','port'])
@@ -102,17 +88,14 @@ class plot_oa(BaseInput):
         for key in keys:
             self.df[key] = self.df[key].mean()
 
-       
-
-       
         """calculate the nose x interp
         interp nose x is interpolation across the same time basis of 50 bins"""
         fake_time = np.linspace(0,1,50)
         for ind, row in self.df.iterrows():
             xT = np.linspace(0,1,len(row['ts_nose_x_cm']))
             yT = np.linspace(0,1,len(row['ts_nose_y_cm']))
-            intx = interp1d(xT, row['ts_nose_x_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
-            inty = interp1d(yT, row['ts_nose_y_cm'], bounds_error=False,fill_value= 'extrapolate')(fake_time).astype(object)
+            intx = interp1d(xT, row['ts_nose_x_cm'], bounds_error=False)(fake_time).astype(object)
+            inty = interp1d(yT, row['ts_nose_y_cm'], bounds_error=False)(fake_time).astype(object)
             
             self.df.at[ind,'time_interp_ts_nose_x_cm'] = intx.astype(object)
             self.df.at[ind,'time_interp_ts_nose_y_cm'] = inty.astype(object)
@@ -130,62 +113,70 @@ class plot_oa(BaseInput):
             if np.nanmean(row['time_interp_ts_nose_y_cm'][:5]) == np.nan:
                 self.df.drop(df.iloc[ind])
         self.df = self.df[self.df['start'].notna()]
-        
-        #print(len(self.df))
+
+        if tasktype == 'obstacle': 
+            self.cluster(numcluster)
+
+            """get average obstacle postition"""
+            keys = list_columns(self.df,['gt'])
+            keys = [key for key in keys if 'cen' not in key]
+
+            for key in keys:
+                self.df['mean_'+key] = np.nan
+            for cluster,cluster_frame in self.df.groupby('obstacle_cluster'):
+                for key in keys:
+                    mean_obstacle = cluster_frame[key].mean()
+
+                    self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
+
+                    #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
 
 
-        #"""get the average of nose x given the same start, obstalce and direction"""
-        #for direction, direction_frame in self.df.groupby(['odd']):
-        #    for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
-        #        for start, start_frame in cluster_frame.groupby(['start']):
-        #            array = np.zeros([len(start_frame), 50])
-        #            count = 0
-        #            for ind,row in start_frame.iterrows():
-        #                array[count,:] = row['interp_ts_nose_x_cm']
-        #                count += 1
-        #            mean_trace = np.nanmean(array,axis = 0)
-        #            x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
-        #            for ind,row in x.iterrows():
-        #                self.df.at[ind,'mean_interp_ts_nose_x_cm']= mean_trace.astype(object)
-        ##print(self.df['mean_interp_ts_nose_x_cm'].isna().sum())
-#
-        #self.df = self.df[self.df['mean_interp_ts_nose_x_cm'].notna()]
-        ##print(len(self.df))
-        
-        """Calculate interp y which is interpolation of nose_x vs nose_y then ploted against the mean_interp_noseX """
-        for ind,row in self.df.iterrows():
 
-            interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value=np.nan)
-            x_basis = np.linspace(10,50,50)
-            interp_y = interp(x_basis.astype(float))
-            interp_y = interpolate_array(interp_y)
-            self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
-            
 
-        
-       
-      
 
-        for direction, direction_frame in self.df.groupby(['odd']):
-            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
-                for start, start_frame in cluster_frame.groupby(['start']):
-                    array = np.zeros([len(start_frame), 50])
-                    count = 0
-                    for ind,row in start_frame.iterrows():
-                        array[count,:] = row['interp_ts_nose_y_cm']
-                        count += 1
-                    mean_trace = np.nanmean(array,axis=0)
-                    median_trace = np.nanmedian(array,axis = 0)
-                    x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
-                    for ind,row in x.iterrows():
-                        self.df.at[ind,'mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
-                    
-                        self.df.at[ind,'median_interp_ts_nose_y_cm']= median_trace.astype(object)
-        
-        
-       
-        get_mean_median_by_variable(self.df,'animal')
-        get_mean_median_by_variable(self.df,'date')
+
+            """Calculate interp y which is interpolation of nose_x vs nose_y then ploted against the mean_interp_noseX """
+            for ind,row in self.df.iterrows():
+
+                interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value=np.nan)
+                x_basis = np.linspace(10,50,50)
+                interp_y = interp(x_basis.astype(float))
+                interp_y = interpolate_array(interp_y)
+                self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+
+
+
+
+
+
+            for direction, direction_frame in self.df.groupby(['odd']):
+                for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                    for start, start_frame in cluster_frame.groupby(['start']):
+                        array = np.zeros([len(start_frame), 50])
+                        count = 0
+                        for ind,row in start_frame.iterrows():
+                            array[count,:] = row['interp_ts_nose_y_cm']
+                            count += 1
+                        mean_trace = np.nanmean(array,axis=0)
+                        median_trace = np.nanmedian(array,axis = 0)
+                        std_trace = np.nanstd(array,axis=0)
+                        mad_trace = stats.median_abs_deviation(array,axis = 0,nan_policy='omit')
+
+                        x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
+                        for ind,row in x.iterrows():
+                            self.df.at[ind,'mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
+
+                            self.df.at[ind,'median_interp_ts_nose_y_cm']= median_trace.astype(object)
+
+                            self.df.at[ind,'std_interp_ts_nose_y_cm']= std_trace.astype(object)
+
+                            self.df.at[ind,'mad_interp_ts_nose_y_cm']= mad_trace.astype(object)
+
+
+
+            get_mean_median_by_variable(self.df,'animal')
+            get_mean_median_by_variable(self.df,'date')
         
         
         
