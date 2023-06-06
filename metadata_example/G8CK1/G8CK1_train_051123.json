@@ -1,0 +1,15 @@
+{
+   "path": "D:/obstacle_avoidance/recordings",
+
+        
+    "051123":{
+            "G8CK1RT": {"oa": {"num_positions": 9}},
+            "G8CK1LT": {"oa": {"num_positions": 9}},
+            "G8CK1TT": {"oa": {"num_positions": 9}},
+            "G8CK1LN": {"oa": {"num_positions": 9}}
+
+
+        
+    }
+        
+ }
