@@ -18,7 +18,8 @@ from scipy.ndimage import gaussian_filter1d
 
 
 import sys
-sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
+sys.path.insert(0, 'C:\Users\Niell Lab\Documents\GitHub\obstacle_avoidance')
+
 import warnings
 warnings.filterwarnings('ignore')
 
