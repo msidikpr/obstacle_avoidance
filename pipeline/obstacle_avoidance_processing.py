@@ -341,6 +341,7 @@ class AvoidanceSession(BaseInput):
            self.data[pos] = self.data[pos].mean()
            
         print('mean')
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
@@ -350,7 +351,7 @@ class AvoidanceSession(BaseInput):
                 interpolate across nans 
                 gausian smooth sigma 3 """
             for key in keys_list:
-                interp_smooth = gaussian_filter1d(interp(row[key]),3)
+                interp_smooth = gaussian_filter1d(interpolate_array(row[key]),3)
                 self.data.at[ind,key] = interp_smooth.astype(float)
             
 
