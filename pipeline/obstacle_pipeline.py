@@ -1,18 +1,18 @@
 import sys
-sys.path.insert(0, 'C:/Users/Niell Lab/Documents/GitHub/obstacle_avoidance')
+sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
 
-warnings.filterwarnings('ignore')
 
+
+import warnings
 
 from obstacle_avoidance_processing import AvoidanceProcessing
 
 
 # metadata json path
-<<<<<<< Updated upstream
-metadata_path = r'T:\Mike\metadata\G8CK1\G8CK1_52623_train_051123.json'
-=======
+
+
 metadata_path = r"D:\obstacle_avoidance\metadata\G8CK1\G8CK1_oa_061323.json"
->>>>>>> Stashed changes
+
 
 
 #C:\Users\nlab\Desktop\mike_bonsai\recordings\metadata
@@ -23,7 +23,7 @@ metadata_path = r"D:\obstacle_avoidance\metadata\G8CK1\G8CK1_oa_061323.json"
 task_name = 'oa'
 
 session = AvoidanceProcessing(metadata_path, task=task_name) 
-session.change_dlc_project(r"E:\other_deeplabcut_projects\project_name-Mike-2023-04-28")
+session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\project_name-Mike-2023-04-28\config.yaml")
 session.dlc_project
 session.preprocess()
 session.process()
