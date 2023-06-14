@@ -227,7 +227,7 @@ class plot_oa(BaseInput):
             """get average obstacle postition"""
             keys = list_columns(self.df,['gt'])
             keys = [key for key in keys if 'cen' not in key]
-            print(keys)
+            
 
             for key in keys:
                 self.df['mean_'+key] = np.nan
