@@ -551,16 +551,20 @@ class AvoidanceSession(BaseInput):
         self.data['time'] = self.data['len']/60
         self.data = self.data[self.data['len']<time_thresh]
         session = plot_oa('empty',self.data)
-        session.cluster(6)
+        session.single_day_df('obstacle',6)
         session.plot_trace_cluster_single_animal()
         print('cluster')
         session.plot_single_trial()
         print('single_trial')
-        session.plot_consecutive_trials_singleday()
-        print('consecutive_trials')
+        #session.plot_consecutive_trials_singleday()
+        #print('consecutive_trials')
+        session.by_start_obstalce_average_single_day()
+        print('average_single_day')
         self.data = session.df
+
         self.raw_data =  self.data
         self.processed_data =  self.data.drop(self.data.filter(regex='likelihood').columns,axis = 1)
+
         print('saving' + self.session_name + 'raw')
         self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('saving' + self.session_name + ' processed')

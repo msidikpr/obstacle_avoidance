@@ -177,6 +177,115 @@ class plot_oa(BaseInput):
 
             get_mean_median_by_variable(self.df,'animal')
             get_mean_median_by_variable(self.df,'date')
+
+    def single_day_df(self,tasktype,numcluster):
+        # list data path files
+        
+        self.df['orginal_index'] = self.df.index
+        self.df =self.df.reset_index()
+
+        """get average areana and port postition """
+        keys = list_columns(self.df,['arena','port'])
+        keys = [i for i in keys if 'cm' in i]
+        keys = [i for i in keys if 'portB' not in i]
+        keys
+        for key in keys:
+            for ind,row in self.df.iterrows():
+                    self.df.at[ind,key] = np.mean(row[key])
+        for key in keys:
+            self.df[key] = self.df[key].mean()
+
+        """calculate the nose x interp
+        interp nose x is interpolation across the same time basis of 50 bins"""
+        fake_time = np.linspace(0,1,50)
+        for ind, row in self.df.iterrows():
+            xT = np.linspace(0,1,len(row['ts_nose_x_cm']))
+            yT = np.linspace(0,1,len(row['ts_nose_y_cm']))
+            intx = interp1d(xT, row['ts_nose_x_cm'], bounds_error=False)(fake_time).astype(object)
+            inty = interp1d(yT, row['ts_nose_y_cm'], bounds_error=False)(fake_time).astype(object)
+            
+            self.df.at[ind,'time_interp_ts_nose_x_cm'] = intx.astype(object)
+            self.df.at[ind,'time_interp_ts_nose_y_cm'] = inty.astype(object)
+        #print(len(self.df))
+
+        """labe top or bottom start"""
+        labels = ['top','bottom']
+        top_bottom = split_range_into_parts(pd.unique(self.df.arenaTL_y_cm).item(),pd.unique(self.df.arenaBL_y_cm).item(),2)
+        top_bottom_dict = dict(zip(labels,top_bottom))
+        for ind, row in self.df.iterrows():
+            if top_bottom_dict.get('top')[0]<= np.nanmean(row['time_interp_ts_nose_y_cm'][:5]) <= top_bottom_dict.get('top')[1]:
+                self.df.at[ind,'start'] = 'top'
+            if top_bottom_dict.get('bottom')[0]<= np.nanmean(row['time_interp_ts_nose_y_cm'][:5]) <= top_bottom_dict.get('bottom')[1]:
+                self.df.at[ind,'start'] = 'bottom'
+            if np.nanmean(row['time_interp_ts_nose_y_cm'][:5]) == np.nan:
+                self.df.drop(df.iloc[ind])
+        self.df = self.df[self.df['start'].notna()]
+
+        if tasktype == 'obstacle': 
+            self.cluster(numcluster)
+
+            """get average obstacle postition"""
+            keys = list_columns(self.df,['gt'])
+            keys = [key for key in keys if 'cen' not in key]
+            print(keys)
+
+            for key in keys:
+                self.df['mean_'+key] = np.nan
+            
+            for cluster,cluster_frame in self.df.groupby('obstacle_cluster'):
+                for key in keys:
+                    mean_obstacle = cluster_frame[key].mean()
+
+                    self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
+
+                    #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
+
+
+
+
+
+
+            """Calculate interp y which is interpolation of nose_x vs nose_y then ploted against the mean_interp_noseX """
+            for ind,row in self.df.iterrows():
+
+                interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value=np.nan)
+                x_basis = np.linspace(10,50,50)
+                interp_y = interp(x_basis.astype(float))
+                interp_y = interpolate_array(interp_y)
+                self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+
+
+
+
+
+
+            for direction, direction_frame in self.df.groupby(['odd']):
+                for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                    for start, start_frame in cluster_frame.groupby(['start']):
+                        array = np.zeros([len(start_frame), 50])
+                        count = 0
+                        for ind,row in start_frame.iterrows():
+                            array[count,:] = row['interp_ts_nose_y_cm']
+                            count += 1
+                        mean_trace = np.nanmean(array,axis=0)
+                        median_trace = np.nanmedian(array,axis = 0)
+                        std_trace = np.nanstd(array,axis=0)
+                        mad_trace = stats.median_abs_deviation(array,axis = 0,nan_policy='omit')
+
+                        x = self.df.loc[(self.df['obstacle_cluster'] ==cluster) & (self.df['start']==start)&(self.df['odd'] ==direction)]
+                        for ind,row in x.iterrows():
+                            self.df.at[ind,'mean_interp_ts_nose_y_cm']= mean_trace.astype(object)
+
+                            self.df.at[ind,'median_interp_ts_nose_y_cm']= median_trace.astype(object)
+
+                            self.df.at[ind,'std_interp_ts_nose_y_cm']= std_trace.astype(object)
+
+                            self.df.at[ind,'mad_interp_ts_nose_y_cm']= mad_trace.astype(object)
+
+
+
+            get_mean_median_by_variable(self.df,'animal')
+            get_mean_median_by_variable(self.df,'date') 
         
         
         
@@ -1079,5 +1188,109 @@ class plot_oa(BaseInput):
                     if direction == 'left':
                         which_axis = left_obstacle_dict.get(cluster)
                         which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],c = color)
+        pdf.savefig(); plt.close()
+        pdf.close()
+    
+    def by_start_obstalce_average_single_day(self):
+        savepath = "D:/obstacle_avoidance/recordings"
+        savepath_session = os.path.join(*[savepath,str(pd.unique(self.df.date).item()),str(pd.unique(self.df.animal).item()),str(pd.unique(self.df.task).item())])
+        pdf = PdfPages(os.path.join((savepath_session),(str(pd.unique(self.df.date).item()) + '_' + str(pd.unique(self.df.animal).item()))+ '_by_start_obstalce_average_single_day.pdf'))
+        key='start'
+        fig = plt.figure(constrained_layout=False, figsize=(20, 10),dpi=90)
+        fig.suptitle('by ' + key + ' '+ 'and ' +'obstacle ')
+        spec2 = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
+
+
+        """Right"""
+        panel_1 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[0])
+        ax1 = fig.add_subplot(panel_1[0,0])
+        plot_arena(self.df,ax1)
+        ax2 = fig.add_subplot(panel_1[0,1])
+        plot_arena(self.df,ax2)
+        ax2.set_title('right')
+        ax3 = fig.add_subplot(panel_1[1,0])
+        plot_arena(self.df,ax3)
+        ax4 = fig.add_subplot(panel_1[1,1])
+        plot_arena(self.df,ax4)
+        ax5 = fig.add_subplot(panel_1[2,0])
+        plot_arena(self.df,ax5)
+        ax6 = fig.add_subplot(panel_1[2,1])
+        plot_arena(self.df,ax6)
+
+        right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+
+
+        """Left """
+        panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
+        ax7 = fig.add_subplot(panel_2[0,0])
+        plot_arena(self.df,ax7)
+        ax8 = fig.add_subplot(panel_2[0,1])
+        plot_arena(self.df,ax8)
+        ax8.set_title('left')
+        ax9 = fig.add_subplot(panel_2[1,0])
+        plot_arena(self.df,ax9)
+        ax10 = fig.add_subplot(panel_2[1,1])
+        plot_arena(self.df,ax10)
+        ax11= fig.add_subplot(panel_2[2,0])
+        plot_arena(self.df,ax11)
+        ax12 = fig.add_subplot(panel_2[2,1])
+        plot_arena(self.df,ax12)
+
+        left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+
+
+
+
+        """ plot trials"""
+        right_obstacle_dict = dict(zip(pd.unique(self.df['obstacle_cluster'].sort_values().to_list()),right_axs))
+        left_obstacle_dict = dict(zip(pd.unique(self.df['obstacle_cluster'].sort_values().to_list()),left_axs))
+
+        for direction, direction_frame in self.df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                #cluster_frame = cluster_frame.sample(num_sample)
+                right_obstacle_axis = right_obstacle_dict.get(cluster)
+                left_obstacle_axis = left_obstacle_dict.get(cluster)
+                plot_obstacle(cluster_frame,right_obstacle_axis,cluster)
+                plot_obstacle(cluster_frame,left_obstacle_axis,cluster)
+                right_obstacle_axis.set_title(str(cluster))
+                left_obstacle_axis.set_title(str(cluster))
+
+                for start, start_frame in cluster_frame.groupby(['start']):
+
+                    if direction == 'right':
+                        if start == 'top':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+
+                    if direction == 'left':
+                        if start == 'top':
+                             if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                             else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+                            else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
         pdf.savefig(); plt.close()
         pdf.close()

@@ -8,7 +8,11 @@ from obstacle_avoidance_processing import AvoidanceProcessing
 
 
 # metadata json path
+<<<<<<< Updated upstream
 metadata_path = r'T:\Mike\metadata\G8CK1\G8CK1_52623_train_051123.json'
+=======
+metadata_path = r"D:\obstacle_avoidance\metadata\G8CK1\G8CK1_oa_061323.json"
+>>>>>>> Stashed changes
 
 
 #C:\Users\nlab\Desktop\mike_bonsai\recordings\metadata
