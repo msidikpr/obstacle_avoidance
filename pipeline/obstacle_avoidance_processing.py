@@ -545,6 +545,8 @@ class AvoidanceSession(BaseInput):
             self.data.at[ind,'gt_obstacle_cen_y' ] = np.mean(yvals)
             self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.mean(yvals_cm)
         print('ob_cen')
+        self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        
 
 
         # drop any transits that were really slow (only drop slowest 10% of transits)
@@ -561,6 +563,7 @@ class AvoidanceSession(BaseInput):
         #print('consecutive_trials')
         session.by_start_obstalce_average_single_day()
         print('average_single_day')
+        session.train_day_summary()
         self.data = session.df
 
         self.raw_data =  self.data
