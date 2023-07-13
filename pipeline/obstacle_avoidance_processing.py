@@ -80,7 +80,8 @@ class AvoidanceProcessing(BaseInput):
                     'top1_ts': [],
                     'poke1_t0':[],
                     'poke2_t0': [],
-                    'top1_t0': []}
+                    'top1_t0': [],
+                    'condition':[]}
         # list of dates for analysis
         data_path = Path(self.path).expanduser()
         # populate dict with metadata and timestamps
@@ -93,9 +94,11 @@ class AvoidanceProcessing(BaseInput):
                     if data_paths != []:
                         _, name = os.path.split(data_paths[1])
                         split_name = name.split('_')
+                        
                         data_dict['date'].append(split_name[0])
                         data_dict['animal'].append(split_name[1])
                         data_dict['task'].append(split_name[4])
+                        data_dict['condition'].append(split_name[2])
                     for ind, csv in enumerate(data_paths):
                         self.timestamp_path = csv
                         time = self.read_timestamp_file()
@@ -103,6 +106,7 @@ class AvoidanceProcessing(BaseInput):
                         split_name = name.split('_')
                         data_dict[split_name[5] +'_ts'].append(time)
                         data_dict[split_name[5] +'_t0'].append(time[0])
+        
         self.all_sessions = pd.DataFrame.from_dict(data_dict)
 ## DLC        
     def change_dlc_project(self, project_paths):
@@ -235,7 +239,7 @@ class AvoidanceSession(BaseInput):
                     df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
                 df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
                
-        df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task']
+        df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task'];  df1['animal'] = self.s['condition']
         if self.tasktype == 'non_obstalce':
             print('non_obstalce')
 
@@ -243,7 +247,7 @@ class AvoidanceSession(BaseInput):
         print('df made')
         
         self.data = df1
-        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         
 
@@ -513,7 +517,7 @@ class AvoidanceSession(BaseInput):
         self.data = self.data.loc[self.data['dist']<80]
         print('dist')
         
-        #self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path, ('test1_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         ##  median point at gt obstacle 
         obstacle_cols = list_columns(self.data,['obstacle'])
