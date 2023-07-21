@@ -239,7 +239,7 @@ class AvoidanceSession(BaseInput):
                     df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
                 df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
                
-        df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task'];  df1['animal'] = self.s['condition']
+        df1['animal'] = self.s['animal']; df1['date'] = self.s['date']; df1['task'] = self.s['task'];  df1['condition'] = self.s['condition']
         if self.tasktype == 'non_obstalce':
             print('non_obstalce')
 
@@ -363,7 +363,7 @@ class AvoidanceSession(BaseInput):
 
             if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>10)
+                odd_ind = np.argmax(nose_list>10) ## change cut off to be based of port position
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
@@ -429,10 +429,11 @@ class AvoidanceSession(BaseInput):
 
        
         ## convert pxl to cm 
-        dist_to_posts = np.median(self.data['arenaTR_x'].iloc[0],0) - np.median(self.data['arenaTL_x'].iloc[0],0)
+        dist_to_posts = np.nanmedian(self.data['arenaTR_x'].iloc[0],0) - np.nanmedian(self.data['arenaTL_x'].iloc[0],0)
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
+        self.data.to_hdf(os.path.join(self.session_path, ('pxl_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
   
 
         # label odd/even trials (i.e. moving leftwards or moving rightwards?)
@@ -445,6 +446,7 @@ class AvoidanceSession(BaseInput):
             elif np.nanmean(nose_points[:10]) >=20:
                 self.data.at[ind,'odd'] = 'right'
         print('odd_even')
+        self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         
 
@@ -460,7 +462,7 @@ class AvoidanceSession(BaseInput):
         port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
         port_arena_list = [i for i in port_arena_list if 'cm' in i]
         for pos in port_arena_list:
-           self.data[pos] = self.data[pos].mean()
+            self.data[pos] = np.mean(self.data[pos])
            
 
 
@@ -483,7 +485,7 @@ class AvoidanceSession(BaseInput):
                 gausian smooth sigma 3 """
             if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>10)
+                odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5))
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
@@ -492,7 +494,7 @@ class AvoidanceSession(BaseInput):
                 #create gt_obstacle points
             else: 
                 nose_list = row['nose_x_cm']
-                even_ind = np.argmax(nose_list<50)
+                even_ind = np.argmax(nose_list<(self.data.rightportT_x_cm.unique()-5))
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
         print('trial_start')

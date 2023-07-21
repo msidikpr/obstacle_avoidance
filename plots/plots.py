@@ -1109,7 +1109,7 @@ class plot_oa(BaseInput):
             pdf.savefig(); plt.close()
         pdf.close()
 
-    def obstacle_by_variable(self,key,color_pallete):
+    def obstacle_by_variable(self,key,color_pallete,name):
         """Direction by key obstalce trials"""
 
         savepath = "D:/obstacle_avoidance/recordings"
@@ -1120,53 +1120,53 @@ class plot_oa(BaseInput):
         color_pallete = color_pallete
         color_map = create_color_dict(self.df,key,color_pallete)
 
-        pdf = PdfPages(os.path.join((savepath_session), 'by ' + str(key)+ ' '+ 'and ' +' obstalce.pdf'))
+        pdf = PdfPages(os.path.join((savepath_session), name + ' '+'by ' + str(key)+ ' '+ 'and ' +' obstalce.pdf'))
 
         fig = plt.figure(constrained_layout=False, figsize=(15, 15),dpi=90)
         fig.suptitle('by ' + key + ' '+ 'and ' +'obstalce ')
         spec2 = gridspec.GridSpec(ncols=1, nrows=2, figure=fig)
 
-
         """Right"""
-        panel_1 = gridspec.GridSpecFromSubplotSpec(2,3,subplot_spec=spec2[0])
+        panel_1 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[0])
         ax1 = fig.add_subplot(panel_1[0,0])
         plot_arena(self.df,ax1)
         ax2 = fig.add_subplot(panel_1[0,1])
         plot_arena(self.df,ax2)
-
-        ax3 = fig.add_subplot(panel_1[0,2])
+        ax2.set_title('right')
+        ax3 = fig.add_subplot(panel_1[1,0])
         plot_arena(self.df,ax3)
-        ax4 = fig.add_subplot(panel_1[1,0])
+        ax4 = fig.add_subplot(panel_1[1,1])
         plot_arena(self.df,ax4)
-        ax5 = fig.add_subplot(panel_1[1,1])
+        ax5 = fig.add_subplot(panel_1[2,0])
         plot_arena(self.df,ax5)
-        ax6 = fig.add_subplot(panel_1[1,2])
+        ax6 = fig.add_subplot(panel_1[2,1])
         plot_arena(self.df,ax6)
-
         right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
         markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
         ax1.legend(markers, color_map.keys(), numpoints=1,title = 'right')
 
-
         """Left """
-        panel_2 = gridspec.GridSpecFromSubplotSpec(2,3,subplot_spec=spec2[1])
+        panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
         ax7 = fig.add_subplot(panel_2[0,0])
         plot_arena(self.df,ax7)
         ax8 = fig.add_subplot(panel_2[0,1])
         plot_arena(self.df,ax8)
         ax8.set_title('left')
-        ax9 = fig.add_subplot(panel_2[0,2])
+        ax9 = fig.add_subplot(panel_2[1,0])
         plot_arena(self.df,ax9)
-        ax10 = fig.add_subplot(panel_2[1,0])
+        ax10 = fig.add_subplot(panel_2[1,1])
         plot_arena(self.df,ax10)
-        ax11= fig.add_subplot(panel_2[1,1])
+        ax11= fig.add_subplot(panel_2[2,0])
         plot_arena(self.df,ax11)
-        ax12 = fig.add_subplot(panel_2[1,2])
+        ax12 = fig.add_subplot(panel_2[2,1])
         plot_arena(self.df,ax12)
-
         left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
         markers = [plt.Line2D([0,0],[0,0],color=color, marker='o', linestyle='') for color in color_map.values()]
         ax7.legend(markers, color_map.keys(), numpoints=1,title = 'left')
+        
+
+
+
 
 
 
