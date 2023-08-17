@@ -10,7 +10,7 @@ from obstacle_avoidance_processing import AvoidanceProcessing
 
 # metadata json path
 
-metadata_path = r"D:\obstacle_avoidance\metadata\compiled_data\G8CK1_G8CK_light.json"
+metadata_path = r"D:\obstacle_avoidance\metadata\compiled_data\G8CK1_G8CK_oa_07_08.json"
 
 
 #C:\Users\nlab\Desktop\mike_bonsai\recordings\metadata

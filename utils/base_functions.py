@@ -221,7 +221,9 @@ def plot_arena(df,axis,obstacle = False):
                           [arena_y[0],arena_y[1],arena_y[2],arena_y[3],arena_y[0]],c='k')
 
     axis.scatter(left_port[0],left_port[1],c='purple',s=200,marker = 's')
+    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=left_port[0],colors='k')
     axis.scatter(right_port[0],right_port[1],c='r',s=200,marker = 's')
+    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=right_port[0],colors='k')
 
     if obstacle == True:
         obstacle_x = pd.unique(df[['mean_gt_obstacleTL_x_cm',
