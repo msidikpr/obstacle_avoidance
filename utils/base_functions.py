@@ -532,6 +532,7 @@ def by_start_obstalce_average_df_key(df,date,key):
 
                     if direction == 'right':
                         if start == 'top':
+                            
                             if cluster in [2,3]:
                                 right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
                                 right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
