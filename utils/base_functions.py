@@ -359,5 +359,249 @@ def get_mean_median_by_variable(df,key):
                         df.at[ind,key+'_''median_interp_ts_nose_y_cm']= median_trace.astype(object)
                         df.at[ind,key+'_''std_interp_ts_nose_y_cm']= std_trace.astype(object)
                         df.at[ind,key+'_''mad_interp_ts_nose_y_cm']= mad_trace.astype(object)
-        
+def by_start_obstalce_average_df(df,date):
+        savepath = "D:/obstacle_avoidance/recordings"
+        savepath_session = os.path.join(*[savepath,'figures'])
+        #savepath_session = os.path.join(*[savepath,str(pd.unique(self.df.date).item()),str(pd.unique(self.df.animal).item()),str(pd.unique(self.df.task).item())])
+        pdf = PdfPages(os.path.join((savepath_session), str(date)+ 'by_' +'_start_'+'obstacle' + 'consecutive.pdf'))
+        key='start'
+        fig = plt.figure(constrained_layout=False, figsize=(20, 10),dpi=90)
+        fig.suptitle('by ' + key + ' '+ 'and ' +'obstacle ')
+        spec2 = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
+
+
+        """Right"""
+        panel_1 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[0])
+        ax1 = fig.add_subplot(panel_1[0,0])
+        plot_arena(df,ax1)
+        ax2 = fig.add_subplot(panel_1[0,1])
+        plot_arena(df,ax2)
+        ax2.set_title('right')
+        ax3 = fig.add_subplot(panel_1[1,0])
+        plot_arena(df,ax3)
+        ax4 = fig.add_subplot(panel_1[1,1])
+        plot_arena(df,ax4)
+        ax5 = fig.add_subplot(panel_1[2,0])
+        plot_arena(df,ax5)
+        ax6 = fig.add_subplot(panel_1[2,1])
+        plot_arena(df,ax6)
+
+        right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+
+
+        """Left """
+        panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
+        ax7 = fig.add_subplot(panel_2[0,0])
+        plot_arena(df,ax7)
+        ax8 = fig.add_subplot(panel_2[0,1])
+        plot_arena(df,ax8)
+        ax8.set_title('left')
+        ax9 = fig.add_subplot(panel_2[1,0])
+        plot_arena(df,ax9)
+        ax10 = fig.add_subplot(panel_2[1,1])
+        plot_arena(df,ax10)
+        ax11= fig.add_subplot(panel_2[2,0])
+        plot_arena(df,ax11)
+        ax12 = fig.add_subplot(panel_2[2,1])
+        plot_arena(df,ax12)
+
+        left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+
+
+
+
+        """ plot trials"""
+        right_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),right_axs))
+        left_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),left_axs))
+
+        for direction, direction_frame in df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                #cluster_frame = cluster_frame.sample(num_sample)
+                right_obstacle_axis = right_obstacle_dict.get(cluster)
+                left_obstacle_axis = left_obstacle_dict.get(cluster)
+                plot_obstacle(cluster_frame,right_obstacle_axis,cluster)
+                plot_obstacle(cluster_frame,left_obstacle_axis,cluster)
+                right_obstacle_axis.set_title(str(cluster))
+                left_obstacle_axis.set_title(str(cluster))
+
+                for start, start_frame in cluster_frame.groupby(['start']):
+
+                    if direction == 'right':
+                        if start == 'top':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+
+                    if direction == 'left':
+                        if start == 'top':
+                             if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                             else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+                            else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+        pdf.savefig(); plt.close()
+        pdf.close()
+def by_start_obstalce_average_df_key(df,date,key):
+        savepath = "D:/obstacle_avoidance/recordings"
+        savepath_session = os.path.join(*[savepath,'figures'])
+        #savepath_session = os.path.join(*[savepath,str(pd.unique(self.df.date).item()),str(pd.unique(self.df.animal).item()),str(pd.unique(self.df.task).item())])
+        pdf = PdfPages(os.path.join((savepath_session), str(date)+ 'by_' +'_start_'+'obstacle' + 'consecutive.pdf'))
+        #key='start'
+        fig = plt.figure(constrained_layout=False, figsize=(20, 10),dpi=90)
+        fig.suptitle('by ' + key + ' '+ 'and ' +'obstacle ')
+        spec2 = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
+
+
+        """Right"""
+        panel_1 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[0])
+        ax1 = fig.add_subplot(panel_1[0,0])
+        plot_arena(df,ax1)
+        ax2 = fig.add_subplot(panel_1[0,1])
+        plot_arena(df,ax2)
+        ax2.set_title('right')
+        ax3 = fig.add_subplot(panel_1[1,0])
+        plot_arena(df,ax3)
+        ax4 = fig.add_subplot(panel_1[1,1])
+        plot_arena(df,ax4)
+        ax5 = fig.add_subplot(panel_1[2,0])
+        plot_arena(df,ax5)
+        ax6 = fig.add_subplot(panel_1[2,1])
+        plot_arena(df,ax6)
+
+        right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+
+
+        """Left """
+        panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
+        ax7 = fig.add_subplot(panel_2[0,0])
+        plot_arena(df,ax7)
+        ax8 = fig.add_subplot(panel_2[0,1])
+        plot_arena(df,ax8)
+        ax8.set_title('left')
+        ax9 = fig.add_subplot(panel_2[1,0])
+        plot_arena(df,ax9)
+        ax10 = fig.add_subplot(panel_2[1,1])
+        plot_arena(df,ax10)
+        ax11= fig.add_subplot(panel_2[2,0])
+        plot_arena(df,ax11)
+        ax12 = fig.add_subplot(panel_2[2,1])
+        plot_arena(df,ax12)
+
+        left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+
+
+
+
+        """ plot trials"""
+        right_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),right_axs))
+        left_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),left_axs))
+
+        for direction, direction_frame in df.groupby(['odd']):
+            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+                #cluster_frame = cluster_frame.sample(num_sample)
+                right_obstacle_axis = right_obstacle_dict.get(cluster)
+                left_obstacle_axis = left_obstacle_dict.get(cluster)
+                plot_obstacle(cluster_frame,right_obstacle_axis,cluster)
+                plot_obstacle(cluster_frame,left_obstacle_axis,cluster)
+                right_obstacle_axis.set_title(str(cluster))
+                left_obstacle_axis.set_title(str(cluster))
+
+                for start, start_frame in cluster_frame.groupby(['start']):
+
+                    if direction == 'right':
+                        if start == 'top':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+                            else:
+                                right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+
+                    if direction == 'left':
+                        if start == 'top':
+                             if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                             else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)
+                        if start == 'bottom':
+                            if cluster in [2,3]:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+                            else:
+                                left_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0],c = 'red')
+                                left_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['mean_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['std_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='red', alpha=0.5)
+
+        pdf.savefig(); plt.close()
+        pdf.close()   
+
+def check_trial_for_obstalce_cross(row): 
+    """function checks if the trail trace crosses through the obsacle and returns boolean
+    True is dose not cross through obstacle. False mean at least one point is inside the obstalce"""
+    
+    obstacle_x = [row['gt_obstacleTL_x_cm'],row['gt_obstacleTR_x_cm'],row['gt_obstacleBR_x_cm'],row['gt_obstacleBL_x_cm']]
+    obstacle_y = [row['gt_obstacleTL_y_cm'],row['gt_obstacleTR_y_cm'],row['gt_obstacleBR_y_cm'],row['gt_obstacleBL_y_cm']]
+    nose_x = row['nose_x_cm'].astype(float)
+    nose_y = row['nose_y_cm'].astype(float)
+
+    def are_points_inside_polygon(x_points, y_points, obstacle_x, obstacle_y):
+        n = len(obstacle_x)
+        results = []
+
+        for x, y in zip(x_points, y_points):
+            inside = False
+            p1x, p1y = obstacle_x[0], obstacle_y[0]
+
+            for i in range(n + 1):
+                p2x, p2y = obstacle_x[i % n], obstacle_y[i % n]
+                if y > min(p1y, p2y):
+                    if y <= max(p1y, p2y):
+                        if x <= max(p1x, p2x):
+                            if p1y != p2y:
+                                xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                            if p1x == p2x or x <= xinters:
+                                inside = not inside
+                p1x, p1y = p2x, p2y
+
+            results.append(inside)
+        return results
+    results = are_points_inside_polygon(nose_x,nose_y,obstacle_x,obstacle_y)
+    if sum(results) == 0:
+        return True  
+    else:
+        return False 
+
         

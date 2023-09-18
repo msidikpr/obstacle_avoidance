@@ -174,6 +174,12 @@ class plot_oa(BaseInput):
                             self.df.at[ind,'std_interp_ts_nose_y_cm']= std_trace.astype(object)
 
                             self.df.at[ind,'mad_interp_ts_nose_y_cm']= mad_trace.astype(object)
+            #copy = self.df.copy(deep=True)
+            ind_to_drop = []
+            for ind,row in self.df.iterrows():
+             if check_trial_for_obstalce_cross(row) == False:
+                ind_to_drop.append(ind)
+            self.df.drop(index=ind_to_drop,inplace=True)
 
 
 
@@ -1440,5 +1446,9 @@ class plot_oa(BaseInput):
 
         pdf.savefig(); plt.close()
         pdf.close()
+    
+
+    
+
 
         
