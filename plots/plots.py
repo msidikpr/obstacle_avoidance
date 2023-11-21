@@ -122,6 +122,7 @@ class plot_oa(BaseInput):
             """get average obstacle postition"""
             keys = list_columns(self.df,['gt'])
             keys = [key for key in keys if 'cen' not in key]
+            keys = [key for key in keys if 'mean' not in key]
 
             for key in keys:
                 self.df['mean_'+key] = np.nan
@@ -130,6 +131,7 @@ class plot_oa(BaseInput):
                     mean_obstacle = cluster_frame[key].mean()
 
                     self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
+                    
 
                     #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
 
@@ -183,8 +185,8 @@ class plot_oa(BaseInput):
 
 
 
-            get_mean_median_by_variable(self.df,'animal')
-            get_mean_median_by_variable(self.df,'date')
+            #get_mean_median_by_variable(self.df,'animal')
+            #get_mean_median_by_variable(self.df,'date')
 
     def single_day_df(self,tasktype,numcluster):
         # list data path files
@@ -1095,7 +1097,7 @@ class plot_oa(BaseInput):
 
             trial_list = list(range(0,len(df),3))
             trial_list = create_sublists(trial_list)
-            trial_list = sample(trial_list,100)
+            #trial_list = sample(trial_list,10)
             for sublist in trial_list:
                 trial = df.iloc[sublist[0]:sublist[1]]
                 trial = trial.reset_index(drop=True)

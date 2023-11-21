@@ -199,6 +199,7 @@ def create_color_dict(df,key,color_pallete):
     return color_map
 
 def plot_arena(df,axis,obstacle = False):
+    df =df.copy(deep=True)
     arena_x = pd.unique(df[['arenaTL_x_cm',
     'arenaTR_x_cm','arenaBR_x_cm',
     'arenaBL_x_cm',
@@ -240,11 +241,12 @@ def plot_arena(df,axis,obstacle = False):
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
 
     
-    axis.set_ylim([51,0]); axis.set_xlim([0, 71])
+    axis.set_ylim([51,0]); axis.set_xlim([0, 61])
 
 
 """input is df of single obstacle cluster"""
 def plot_obstacle(df,axis,cluster):
+    df = df.copy()
     keys = list_columns(df,['gt'])
     keys = [key for key in keys if 'cen' not in key]
     for key in keys:
@@ -532,7 +534,7 @@ def by_start_obstalce_average_df_key(df,date,key):
 
                     if direction == 'right':
                         if start == 'top':
-                            
+
                             if cluster in [2,3]:
                                 right_obstacle_axis.plot(np.linspace(10,50,50),start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0],c = 'black')
                                 right_obstacle_axis.fill_between(np.linspace(10,50,50), start_frame[key + '_'+'median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)+start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), start_frame['median_interp_ts_nose_y_cm'].to_numpy()[0].astype(float)-start_frame['mad_interp_ts_nose_y_cm'].to_numpy()[0].astype(float), facecolor='black', alpha=0.5)

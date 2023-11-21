@@ -1,0 +1,33 @@
+"""plots for light_dark and visual condition data"""
+import cv2
+import json, os, cv2
+from pathlib import Path
+import pandas as pd 
+import matplotlib.pyplot as plt 
+import numpy as np
+import xarray as xr
+import seaborn as sns
+import h5py as hf
+from tqdm import tqdm
+from tqdm import tqdm
+import itertools 
+from scipy.interpolate import interp1d
+from scipy import signal
+from matplotlib.backends.backend_pdf import PdfPages
+from sklearn.cluster import KMeans
+import matplotlib.colors as mcolors
+import os, fnmatch
+from scipy.spatial.distance import cdist
+
+import sys
+sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
+#sys.path.append(r'C:\Users\nlab\Documents\GitHub\obstacle_avoidance\plots') # go to parent dir 
+
+from utils.base_functions import *
+from src.utils.auxiliary import flatten_series
+from src.utils.path import find
+from src.base import BaseInput
+from plots.plots import plot_oa
+#from plots.plots import *
+import warnings
+warnings.filterwarnings('ignore')
