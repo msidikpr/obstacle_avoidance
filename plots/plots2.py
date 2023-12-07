@@ -628,32 +628,51 @@ def find_consective_trials(df):
                                         df.at[row[0],'consecutive'] = int(1)
                                 except KeyError:
                                     df.at[row[0],'consecutive'] = int(1)
-def create_long_df(df):
+def create_df_by_type(df):
     '''creates df of only long aprochaes'''
-    cluster_0 = df[(df['obstacle_cluster']==0)&(df['start']=='top')&(df['odd']== 'right')]
-    cluster_1 = df[(df['obstacle_cluster']==1)&(df['start']=='top')&(df['odd']== 'left')]
-    cluster_4 = df[(df['obstacle_cluster']==4)&(df['start']=='bottom')&(df['odd']== 'right')]
-    cluster_5 = df[(df['obstacle_cluster']==5)&(df['start']=='bottom')&(df['odd']== 'left')]
+    cluster_0_long = df[(df['obstacle_cluster']==0)&(df['start']=='top')&(df['odd']== 'right')]
+    cluster_1_long = df[(df['obstacle_cluster']==1)&(df['start']=='top')&(df['odd']== 'left')]
+    cluster_4_long = df[(df['obstacle_cluster']==4)&(df['start']=='bottom')&(df['odd']== 'right')]
+    cluster_5_long = df[(df['obstacle_cluster']==5)&(df['start']=='bottom')&(df['odd']== 'left')]
 
-    long_df = pd.concat([cluster_0,cluster_1,cluster_4,cluster_5])
-    return long_df
+    cluster_0_short = df[(df['obstacle_cluster']==0)&(df['start']=='top')&(df['odd']== 'left')]
+    cluster_1_short = df[(df['obstacle_cluster']==1)&(df['start']=='top')&(df['odd']== 'right')]
+    cluster_4_short = df[(df['obstacle_cluster']==4)&(df['start']=='bottom')&(df['odd']== 'left')]
+    cluster_5_short = df[(df['obstacle_cluster']==5)&(df['start']=='bottom')&(df['odd']== 'right')]
+
+    cluster_2 = df[(df['obstacle_cluster']==2)]
+    cluster_3 = df[(df['obstacle_cluster']==3)]
+
+    
+    
+
+    long_df = pd.concat([cluster_0_long,cluster_1_long,cluster_4_long,cluster_5_long])
+    short_df = pd.concat([cluster_0_short,cluster_1_short,cluster_4_short,cluster_5_short])
+    middle_df = pd.concat([cluster_2,cluster_3])
+    return long_df,short_df,middle_df
 def zero_out_angle(df):
     '''sets angles to target corner to zero after first time angles to corner'''
     for ind, row in df.iterrows():
         angle_array = copy.deepcopy(row['angle_to_corner'])
-        zero = angle_array[np.nanargmin(np.abs(angle_array - 0))]
-        zero_ind = np.where(angle_array == zero)[0][0]
-        angle_array[zero_ind:] = 0 
-        df.at[ind,'zero_out_angle_to_corner'] = angle_array.astype(object)
+        try:
+            zero = angle_array[np.nanargmin(np.abs(angle_array - 0))]
+            zero_ind = np.where(angle_array == zero)[0][0]
+            angle_array[zero_ind:] = 0 
+            df.at[ind,'zero_out_angle_to_corner'] = angle_array.astype(object)
+        except:
+            continue
 
 
 def zero_out_angle_target_port(df):
     for ind, row in df.iterrows():
         angle_array = copy.deepcopy(row['angle_to_target_port'])
-        zero = angle_array[np.nanargmax(np.abs(angle_array - 0))]
-        zero_ind = np.where(angle_array == zero)[0][0]
-        angle_array[zero_ind:] = 0 
-        df.at[ind,'zero_out_angle_to_target_port'] = angle_array.astype(object)
+        try:
+            zero = angle_array[np.nanargmax(np.abs(angle_array - 0))]
+            zero_ind = np.where(angle_array == zero)[0][0]
+            angle_array[zero_ind:] = 0 
+            df.at[ind,'zero_out_angle_to_target_port'] = angle_array.astype(object)
+        except:
+            continue
 def calculate_speed(df):
     for ind, row in df.iterrows():
         if row['odd'] == 'left': 
@@ -665,7 +684,7 @@ def calculate_speed(df):
             even_ind = np.argmax(nose_list<(df.rightportT_x_cm.unique()-5))
             temp_time = np.diff(row['trial_timestamps'][even_ind:])
             #temp_time = np.diff(row['trial_timestamps'])
-        x = np.diff(row['nose_x_cm']); y = np.diff(row['nose_y_cm'])
+        x = np.diff(row['ts_nose_x_cm']); y = np.diff(row['ts_nose_y_cm'])
         if len(x) == len(temp_time):
             xspeed = list((x/temp_time)**2)
         elif len(x) > len(temp_time):
@@ -678,7 +697,71 @@ def calculate_speed(df):
             yspeed = list((y[:len(temp_time)]/temp_time)**2)
         elif len(y) < len(temp_time):
             yspeed = list((y/temp_time[:len(y)])**2)
-        df.at[ind, 'speed']  = np.sqrt(xspeed + yspeed).astype(object)
+        df.at[ind, 'speed']  = np.sqrt(np.sum([xspeed, yspeed],axis=0)).astype(object)
         distance = np.sqrt((x.astype(float))**2) + np.sqrt((y.astype(float))**2)
         df.at[ind, 'distance'] = distance.astype(object)
         df.at[ind, 'total_distance'] = np.nansum(distance).astype(object)
+
+
+def plot_trials_sample(df,sample):
+    """Direction by key obstalce trials"""
+   
+    fig = plt.figure(constrained_layout=False, figsize=(20, 10),dpi=90)
+    
+    spec2 = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
+    """Right"""
+    panel_1 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[0])
+    ax1 = fig.add_subplot(panel_1[0,0])
+    plot_arena(df,ax1)
+    ax2 = fig.add_subplot(panel_1[0,1])
+    plot_arena(df,ax2)
+    ax2.set_title('right')
+    ax3 = fig.add_subplot(panel_1[1,0])
+    plot_arena(df,ax3)
+    ax4 = fig.add_subplot(panel_1[1,1])
+    plot_arena(df,ax4)
+    ax5 = fig.add_subplot(panel_1[2,0])
+    plot_arena(df,ax5)
+    ax6 = fig.add_subplot(panel_1[2,1])
+    plot_arena(df,ax6)
+    right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+
+    """Left """
+    panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
+    ax7 = fig.add_subplot(panel_2[0,0])
+    plot_arena(df,ax7)
+    ax8 = fig.add_subplot(panel_2[0,1])
+    plot_arena(df,ax8)
+    ax8.set_title('left')
+    ax9 = fig.add_subplot(panel_2[1,0])
+    plot_arena(df,ax9)
+    ax10 = fig.add_subplot(panel_2[1,1])
+    plot_arena(df,ax10)
+    ax11= fig.add_subplot(panel_2[2,0])
+    plot_arena(df,ax11)
+    ax12 = fig.add_subplot(panel_2[2,1])
+    plot_arena(df,ax12)
+    left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+   
+    
+    
+
+    """ plot trials"""
+    right_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),right_axs))
+    left_obstacle_dict = dict(zip(pd.unique(df['obstacle_cluster'].sort_values().to_list()),left_axs))
+    for direction, direction_frame in df.groupby(['odd']):
+        for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
+            cluster_frame = cluster_frame.sample(sample)
+            right_obstacle_axis = right_obstacle_dict.get(cluster)
+            left_obstalce_axis = left_obstacle_dict.get(cluster)
+            plot_obstacle(cluster_frame,right_obstacle_axis,cluster)
+            plot_obstacle(cluster_frame,left_obstalce_axis,cluster)
+            right_obstacle_axis.set_title(str(cluster))
+            left_obstalce_axis.set_title(str(cluster))
+            for ind,row in cluster_frame.iterrows():
+                if direction == 'right':
+                    which_axis = right_obstacle_dict.get(cluster)
+                    which_axis.plot(row['nose_x_cm'],row['nose_y_cm'],alpha = .5)
+                if direction == 'left':
+                    which_axis = left_obstacle_dict.get(cluster)
+                    which_axis.plot(row['nose_x_cm'],row['nose_y_cm'],alpha = .5)

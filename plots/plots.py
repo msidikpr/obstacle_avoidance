@@ -80,13 +80,43 @@ class plot_oa(BaseInput):
         """get average areana and port postition """
         keys = list_columns(self.df,['arena','port'])
         keys = [i for i in keys if 'cm' in i]
-        keys = [i for i in keys if 'portB' not in i]
         keys
         for key in keys:
             for ind,row in self.df.iterrows():
                     self.df.at[ind,key] = np.mean(row[key])
         for key in keys:
             self.df[key] = self.df[key].mean()
+        """redo ts_body parts"""
+        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        for ind,row in self.df.iterrows():
+            if row['odd']=='left':
+                nose_list = row['nose_x_cm'] 
+                odd_ind = np.argmax(nose_list>(self.df.leftportT_x_cm.unique()+5))
+                ind_list =  list(range(len(row['nose_x_cm']))) 
+                ts_inds = ind_list[odd_ind:]
+                self.df.at[ind,'ts_inds'] = np.array(ts_inds).astype(object)
+                for key in keys:
+                    ts_part_x = row[key + '_x_cm'][odd_ind:]
+                    ts_part_y = row[key + '_y_cm'][odd_ind:]
+                    self.df.at[ind,'ts_'+key + '_x_cm'] = ts_part_x
+                    self.df.at[ind,'ts_'+key + '_y_cm'] = ts_part_y
+
+
+                
+
+            else:
+                nose_list = row['nose_x_cm']
+                even_ind = np.argmax(nose_list<(self.df.rightportT_x_cm.unique()-5))
+                ind_list =  list(range(len(row['nose_x_cm']))) 
+                ts_inds = ind_list[even_ind:]
+                self.df.at[ind,'ts_inds'] = np.array(ts_inds).astype(object)
+                for key in keys:
+                    ts_part_x = row[key + '_x_cm'][even_ind:]
+                    ts_part_y = row[key + '_y_cm'][even_ind:]
+                    self.df.at[ind,'ts_'+key + '_x_cm'] = ts_part_x
+                    self.df.at[ind,'ts_'+key + '_y_cm'] = ts_part_y
+
+
 
         """calculate the nose x interp
         interp nose x is interpolation across the same time basis of 50 bins"""
@@ -114,7 +144,7 @@ class plot_oa(BaseInput):
                 self.df.drop(df.iloc[ind])
         self.df = self.df[self.df['start'].notna()]
 
-        self.get_angle_to_ports()
+        #self.get_angle_to_ports()
 
         if tasktype == 'obstacle': 
             self.cluster(numcluster)
