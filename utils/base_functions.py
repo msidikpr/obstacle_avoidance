@@ -251,6 +251,7 @@ def plot_obstacle(df,axis,cluster):
     keys = [key for key in keys if 'cen' not in key]
     for key in keys:
         df.loc[df.obstacle_cluster ==cluster,key] = df.loc[df.obstacle_cluster ==cluster,key].mean()
+    
     obstacle_x = pd.unique(df[['mean_gt_obstacleTL_x_cm',
         'mean_gt_obstacleTR_x_cm','mean_gt_obstacleBR_x_cm',
         'mean_gt_obstacleBL_x_cm',
@@ -607,4 +608,16 @@ def check_trial_for_obstalce_cross(row):
     else:
         return False 
 
-        
+def drop_nans_in_columns(df,column):
+    copy =df.copy(deep=True) 
+    nan_inds = copy.index[np.where(copy[column].isnull())[0]]
+    copy = copy.drop(index=nan_inds)
+    return copy
+
+
+def reject_outliers(data, m = 2):
+    d = np.abs(data - np.median(data))
+    mdev = np.median(d)
+    s = d/mdev if mdev else np.zeros(len(d))
+    inds = np.argwhere(data[s<m])
+    return data[s<m],inds

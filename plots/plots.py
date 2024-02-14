@@ -50,7 +50,7 @@ class plot_oa(BaseInput):
         self.df = df 
         
     ## append df's together
-    def gather_session_df(self,tasktype,numcluster):
+    def  gather_session_df(self,tasktype,numcluster):
         # list data path files
         data_path = Path(self.path).expanduser()
         # find date

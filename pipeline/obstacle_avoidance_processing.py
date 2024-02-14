@@ -346,7 +346,34 @@ class AvoidanceSession(BaseInput):
            self.data[pos] = self.data[pos].mean()
            
         print('mean')
-        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        #keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        #keys_list = list_columns(self.data,keys)
+        #keys_list= [col for col in keys_list if 'likelihood' not in col]
+        #keys_list= [col for col in keys_list if 'lind' not in col]
+ #
+        ## check if odd or even trial
+        ##  get first index when nose crosses a distance thresh hold
+        ##trail start = ts
+        ###odd tiral at 16 cm even at 56 cm     
+        #for ind, row in self.data.iterrows(): 
+        #    """interpolate and smooth key points
+        #        interpolate across nans 
+        #        gausian smooth sigma 3 """
+        #    if row['odd'] == 'left':
+        #        nose_list = row['nose_x_cm'] 
+        #        odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5))
+        #        for key in keys_list:
+        #            self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
+        #        #use odd_ind to index into obstacle 
+        #        # iterate over columns list  
+#
+        #        #create gt_obstacle points
+        #    else: 
+        #        nose_list = row['nose_x_cm']
+        #        even_ind = np.argmax(nose_list<(self.data.rightportT_x_cm.unique()-5))
+        #        for key in keys_list:
+        #            self.data.at[ind,'ts_' + key] = row[key][even_ind:]
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
@@ -363,7 +390,7 @@ class AvoidanceSession(BaseInput):
 
             if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>10) ## change cut off to be based of port position
+                odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5)) ## change cut off to be based of port position
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
                 #use odd_ind to index into obstacle 
@@ -372,10 +399,11 @@ class AvoidanceSession(BaseInput):
                 #create gt_obstacle points
             else: 
                 nose_list = row['nose_x_cm']
-                even_ind = np.argmax(nose_list<50)
+                even_ind = np.argmax(nose_list<(self.data.rightportT_x_cm.unique()-5))
                 for key in keys_list:
                     self.data.at[ind,'ts_' + key] = row[key][even_ind:]
         print('trial_start_smooth')
+
         for ind,row in self.data.iterrows(): 
             dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
             self.data.at[ind,'dist'] = dist
