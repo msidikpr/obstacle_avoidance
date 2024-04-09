@@ -176,8 +176,13 @@ class plot_oa(BaseInput):
                 interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value=np.nan)
                 x_basis = np.linspace(10,50,50)
                 interp_y = interp(x_basis.astype(float))
-                interp_y = interpolate_array(interp_y)
-                self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+                try:
+                    interp_y = interpolate_array(interp_y)
+                    self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+                except ValueError:
+                    self. df.at[ind,'interp_ts_nose_y_cm'] = np.nan
+              
+                
 
 
 
@@ -264,6 +269,7 @@ class plot_oa(BaseInput):
 
         if tasktype == 'obstacle': 
             self.cluster(numcluster)
+            print('clustered')
 
             """get average obstacle postition"""
             keys = list_columns(self.df,['gt'])
@@ -278,6 +284,8 @@ class plot_oa(BaseInput):
                     mean_obstacle = cluster_frame[key].mean()
 
                     self.df.loc[self.df['obstacle_cluster'] ==cluster,['mean_'+key]] = mean_obstacle
+            print('clustered')
+        
 
                     #self.df.loc[self.df.obstacle_cluster == cluster,'mean_'+key] = cluster_frame[key].mean()
 
@@ -292,8 +300,14 @@ class plot_oa(BaseInput):
                 interp = interp1d(row['ts_nose_x_cm'].astype(float), row['ts_nose_y_cm'].astype(float) ,bounds_error=False, fill_value=np.nan)
                 x_basis = np.linspace(10,50,50)
                 interp_y = interp(x_basis.astype(float))
-                interp_y = interpolate_array(interp_y)
-                self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+                try:
+                    interp_y = interpolate_array(interp_y)
+                    self.df.at[ind,'interp_ts_nose_y_cm'] = interp_y.astype(object)
+                except ValueError:
+                    self. df.at[ind,'interp_ts_nose_y_cm'] = np.nan
+              
+                
+                
 
 
 
@@ -864,7 +878,7 @@ class plot_oa(BaseInput):
                         plt.subplot(int((y/4)),4,ind+1)
                         plt.gca().set_aspect('equal', adjustable='box')
                         plt.gca().set_title(str(row['odd'])+str(ind))
-                        plt.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'])
+                        plt.plot(row['nose_x_cm'],row['nose_y_cm'])
                         plt.plot([row['arenaTL_x_cm'], row['arenaTR_x_cm'], row['arenaBR_x_cm'], row['arenaBL_x_cm'],row['arenaTL_x_cm']],
                                 [row['arenaTL_y_cm'], row['arenaTR_y_cm'], row['arenaBR_y_cm'], row['arenaBL_y_cm'],row['arenaTL_y_cm']],color='orange')
 

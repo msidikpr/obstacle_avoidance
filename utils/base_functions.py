@@ -192,10 +192,21 @@ def interpolate_array(array):
     return array.astype(float)
 
 """create color dict for unique items in list"""
-def create_color_dict(df,key,color_pallete):
-    color_labels = df[key].unique().astype(str)
-    rgb_values = sns.color_palette(color_pallete, len(color_labels))
-    color_map = dict(zip(color_labels, rgb_values))
+def create_color_dict(df,key,color_pallete,sort =False):
+    if sort == True:
+        color_labels = df[key].unique().astype(int)
+        color_labels.sort()
+        color_labels = color_labels.astype(str)
+        rgb_values = sns.color_palette(color_pallete, len(color_labels))
+        color_map = dict(zip(color_labels, rgb_values))
+        color_map = {'0'+k: v for k, v in color_map.items()}
+
+
+
+    else:    
+        color_labels = df[key].unique().astype(str)
+        rgb_values = sns.color_palette(color_pallete, len(color_labels))
+        color_map = dict(zip(color_labels, rgb_values))
     return color_map
 
 def plot_arena(df,axis,obstacle = False):
@@ -236,6 +247,51 @@ def plot_arena(df,axis,obstacle = False):
         'mean_gt_obstacleTR_y_cm','mean_gt_obstacleBR_y_cm',
         'mean_gt_obstacleBL_y_cm',
         'mean_gt_obstacleTL_y_cm']].values.ravel('K'))
+
+        axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
+                              [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
+
+    
+    axis.set_ylim([51,0]); axis.set_xlim([0, 61])
+
+def plot_arena_single(df,axis,obstacle = False):
+    df =df.copy(deep=True)
+    arena_x = pd.unique(df[['arenaTL_x_cm',
+    'arenaTR_x_cm','arenaBR_x_cm',
+    'arenaBL_x_cm',
+    'arenaTL_x_cm']].values.ravel('K'))
+
+    arena_y = pd.unique(df[['arenaTL_y_cm',
+    'arenaTR_y_cm','arenaBR_y_cm',
+    'arenaBL_y_cm',
+    'arenaTL_y_cm']].values.ravel('K'))
+
+    
+
+    left_port =  pd.unique(df[['leftportT_x_cm','leftportT_y_cm']].values.ravel('K'))
+
+    right_port = pd.unique(df[['rightportT_x_cm','rightportT_y_cm']].values.ravel('K'))
+
+    
+    
+    axis.plot([arena_x[0],arena_x[1],arena_x[2],arena_x[3],arena_x[0]],
+                          [arena_y[0],arena_y[1],arena_y[2],arena_y[3],arena_y[0]],c='k')
+
+    axis.scatter(left_port[0],left_port[1],c='purple',s=200,marker = 's')
+    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=left_port[0],colors='k')
+    axis.scatter(right_port[0],right_port[1],c='r',s=200,marker = 's')
+    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=right_port[0],colors='k')
+
+    if obstacle == True:
+        obstacle_x = pd.unique(df[['gt_obstacleTL_x_cm',
+        'gt_obstacleTR_x_cm','gt_obstacleBR_x_cm',
+        'gt_obstacleBL_x_cm',
+        'gt_obstacleTL_x_cm']].values.ravel('K'))
+
+        obstacle_y =  pd.unique(df[['gt_obstacleTL_y_cm',
+        'gt_obstacleTR_y_cm','gt_obstacleBR_y_cm',
+        'gt_obstacleBL_y_cm',
+        'gt_obstacleTL_y_cm']].values.ravel('K'))
 
         axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
@@ -621,3 +677,24 @@ def reject_outliers(data, m = 2):
     s = d/mdev if mdev else np.zeros(len(d))
     inds = np.argwhere(data[s<m])
     return data[s<m],inds
+
+def create_consective_df_new(df):
+        """get df from data of groups of 3 trials that are consecutive """
+        con_df = pd.DataFrame()
+        copy = df.copy(deep=True)
+        copy = copy.reset_index(drop=True)
+        for animal,animal_frame in copy.groupby('animal'):
+            for date, date_frame in animal_frame.groupby('date'):
+                repeats_list = find_consecutive_repeats(date_frame['obstacle_cluster'])
+                for i in range(len(repeats_list)):
+                    check = date_frame.loc[repeats_list[i][0]:repeats_list[i][1]]
+                    #print(np.diff(check['index'].to_numpy()).sum())
+                    if np.diff(check['index'].to_numpy()).sum()==2:
+                        trial_df = pd.DataFrame()
+                        trial_df = trial_df.append(date_frame.loc[repeats_list[i][0]:repeats_list[i][1]])
+                        trial_df['consective_inds'] = str(list(range(repeats_list[i][0], repeats_list[i][1]+1)))
+                        con_df = con_df.append(trial_df) 
+                    else:
+                        continue
+                       
+        return con_df
