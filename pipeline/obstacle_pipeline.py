@@ -10,7 +10,7 @@ from obstacle_avoidance_processing import AvoidanceProcessing
 
 # metadata json path
 
-metadata_path = r"D:\obstacle_avoidance\metadata\compiled_data\G8CK1_G8CK_light.json"
+metadata_path = r"D:\obstacle_avoidance\metadata\J701_704\J704_oadark.json"
 
 
 #C:\Users\nlab\Desktop\mike_bonsai\recordings\metadata
@@ -21,7 +21,7 @@ metadata_path = r"D:\obstacle_avoidance\metadata\compiled_data\G8CK1_G8CK_light.
 task_name = 'oa'
 
 session = AvoidanceProcessing(metadata_path, task=task_name) 
-session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\project_name-Mike-2023-04-28\config.yaml")
+session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\obstacle_obstacle_avoidance_070124-Mike-2024-07-01\config.yaml")
 session.dlc_project
 session.preprocess()
 session.process()

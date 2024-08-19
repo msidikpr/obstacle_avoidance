@@ -7,6 +7,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy import stats
+import sys
+sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
+from plots.plots2 import *
 
 import seaborn as sns
 
@@ -19,7 +22,7 @@ def format_frames(vid_path, dwnsmpl):
     vidread = cv2.VideoCapture(vid_path)
     # empty array that is the target shape
     # should be number of frames x downsampled height x downsampled width
-    all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)),
+    all_frames = np.empty([int(vidread.get(cv2.CAP_PROP_FRAME_COUNT)), 
                            int(vidread.get(cv2.CAP_PROP_FRAME_HEIGHT)*dwnsmpl),
                            int(vidread.get(cv2.CAP_PROP_FRAME_WIDTH)*dwnsmpl)], dtype=np.uint8)
     # iterate through each frame
@@ -211,21 +214,35 @@ def create_color_dict(df,key,color_pallete,sort =False):
 
 def plot_arena(df,axis,obstacle = False):
     df =df.copy(deep=True)
-    arena_x = pd.unique(df[['arenaTL_x_cm',
+    #arena_x = pd.unique(df[['arenaTL_x_cm',
+    #'arenaTR_x_cm','arenaBR_x_cm',
+    #'arenaBL_x_cm',
+    #'arenaTL_x_cm']].values.ravel('K'))
+#
+    #arena_y = pd.unique(df[['arenaTL_y_cm',
+    #'arenaTR_y_cm','arenaBR_y_cm',
+    #'arenaBL_y_cm',
+    #'arenaTL_y_cm']].values.ravel('K'))
+
+    arena_x = df[['arenaTL_x_cm',
     'arenaTR_x_cm','arenaBR_x_cm',
     'arenaBL_x_cm',
-    'arenaTL_x_cm']].values.ravel('K'))
+    'arenaTL_x_cm']].median().values.ravel('K')
 
-    arena_y = pd.unique(df[['arenaTL_y_cm',
+    arena_y = df[['arenaTL_y_cm',
     'arenaTR_y_cm','arenaBR_y_cm',
     'arenaBL_y_cm',
-    'arenaTL_y_cm']].values.ravel('K'))
-
+    'arenaTL_y_cm']].median().values.ravel('K')
     
 
-    left_port =  pd.unique(df[['leftportT_x_cm','leftportT_y_cm']].values.ravel('K'))
+    #left_port =  pd.unique(df[['leftportT_x_cm','leftportT_y_cm']].values.ravel('K'))
 
-    right_port = pd.unique(df[['rightportT_x_cm','rightportT_y_cm']].values.ravel('K'))
+    #right_port = pd.unique(df[['rightportT_x_cm','rightportT_y_cm']].values.ravel('K'))
+
+    left_port =  df[['leftportT_x_cm','leftportT_y_cm']].median().values.ravel('K')
+
+    right_port = df[['rightportT_x_cm','rightportT_y_cm']].median().values.ravel('K')
+
 
     
     
@@ -233,20 +250,20 @@ def plot_arena(df,axis,obstacle = False):
                           [arena_y[0],arena_y[1],arena_y[2],arena_y[3],arena_y[0]],c='k')
 
     axis.scatter(left_port[0],left_port[1],c='purple',s=200,marker = 's')
-    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=left_port[0],colors='k')
+    axis.vlines(ymax=arena_y[0],ymin=arena_y[3],x=left_port[0],colors='k')
     axis.scatter(right_port[0],right_port[1],c='r',s=200,marker = 's')
-    axis.vlines(ymax=arena_y[0],ymin=arena_y[2],x=right_port[0],colors='k')
+    axis.vlines(ymax=arena_y[1],ymin=arena_y[2],x=right_port[0],colors='k')
 
     if obstacle == True:
         obstacle_x = pd.unique(df[['mean_gt_obstacleTL_x_cm',
         'mean_gt_obstacleTR_x_cm','mean_gt_obstacleBR_x_cm',
         'mean_gt_obstacleBL_x_cm',
-        'mean_gt_obstacleTL_x_cm']].values.ravel('K'))
+        'mean_gt_obstacleTL_x_cm']].median().values.ravel('K'))
 
         obstacle_y =  pd.unique(df[['mean_gt_obstacleTL_y_cm',
         'mean_gt_obstacleTR_y_cm','mean_gt_obstacleBR_y_cm',
         'mean_gt_obstacleBL_y_cm',
-        'mean_gt_obstacleTL_y_cm']].values.ravel('K'))
+        'mean_gt_obstacleTL_y_cm']].median().values.ravel('K'))
 
         axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
@@ -320,10 +337,10 @@ def plot_obstacle(df,axis,cluster):
 
     axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
-    axis.set_ylim([51,0]); axis.set_xlim([0, 71])
+    axis.set_ylim([51,0]); axis.set_xlim([0, 61])
 
 
-def plot_orginal_obstacle(df,axis,cluster):
+def plot_orginal_obstacle(df,axis,cluster, correct = False, corect_x= 0,corect_y = 0):
     keys = list_columns(df,['gt'])
     keys = [key for key in keys if 'cen' not in key]
     for key in keys:
@@ -338,9 +355,14 @@ def plot_orginal_obstacle(df,axis,cluster):
     'gt_obstacleBL_y_cm',
     'gt_obstacleTL_y_cm']].values.ravel('K'))
 
-    axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
+    if correct == False:
+        axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')
-    axis.set_ylim([51,0]); axis.set_xlim([0, 71])
+        axis.set_ylim([51,0]); axis.set_xlim([0, 61])
+    else:
+        axis.plot([obstacle_x[0]+corect_x,obstacle_x[1]+corect_x,obstacle_x[2]+corect_x,obstacle_x[3]+corect_x,obstacle_x[0]+corect_x],
+                              [obstacle_y[0]+corect_y,obstacle_y[1]+corect_y,obstacle_y[2]+corect_y,obstacle_y[3]+corect_y,obstacle_y[0]+corect_y],c='k')
+        axis.set_ylim([51,0]); axis.set_xlim([0, 61])
 
 
 
@@ -693,8 +715,295 @@ def create_consective_df_new(df):
                         trial_df = pd.DataFrame()
                         trial_df = trial_df.append(date_frame.loc[repeats_list[i][0]:repeats_list[i][1]])
                         trial_df['consective_inds'] = str(list(range(repeats_list[i][0], repeats_list[i][1]+1)))
+                        trial_df['consective_type'] = [1,2,3]
                         con_df = con_df.append(trial_df) 
                     else:
                         continue
                        
         return con_df
+def save_dataframe_to_hdf(dataframe, directory, filename):
+    """
+    Save a Pandas DataFrame to an HDF5 file in the specified directory.
+
+    Parameters:
+    dataframe (pandas.DataFrame): The DataFrame to be saved.
+    directory (str): The directory where the HDF5 file will be saved.
+    filename (str): The name of the HDF5 file.
+
+    Returns:
+    str: The full path of the saved HDF5 file.
+    """
+    # Ensure the directory exists, create it if it doesn't
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Concatenate directory and filename to get the full path
+    full_path = os.path.join(directory, filename)
+
+    # Save the DataFrame to HDF5 file
+    dataframe.to_hdf(full_path, key='data', mode='w')
+
+    return full_path
+
+def flatten_list_of_arrays(array_list):
+    flatten_array_list = np.concatenate(array_list).ravel().tolist()
+    return np.asarray(flatten_array_list)
+
+def get_ob_distance_from_mean_center(df):
+    df['mean_center_x'] = np.nan
+    df['mean_center_y'] = np.nan
+    for cluster,cluter_df in df.groupby(['obstacle_cluster']):
+        gt_label = cluter_df['obstacle_cluster'].astype(int).tolist()
+        obstacle_xpos = np.array(cluter_df.loc[:,'gt_obstacle_cen_x_cm'])
+        obstacle_ypos = np.array(cluter_df.loc[:,'gt_obstacle_cen_y_cm'])
+        obstacle_xypos_ar = np.stack((obstacle_xpos, obstacle_ypos))
+        mean_x =np.nanmean(obstacle_xpos)
+        mean_y = np.nanmean(obstacle_ypos)
+        df['mean_center_x'][df['obstacle_cluster']==cluster]  = mean_x
+        df['mean_center_y'][df['obstacle_cluster']==cluster]  = mean_y
+    for ind,row in df.iterrows():
+        distance_from_mean_center = calculate_distances(np.array(row.gt_obstacle_cen_x_cm),
+                                                        np.array(row.gt_obstacle_cen_y_cm),row.mean_center_x,row.mean_center_y)
+        df.at[ind,'distance_from_mean_center'] = distance_from_mean_center
+
+def ts_lateral_error_to_target_port(df):
+    for direction, direction_frame in df.groupby(['odd']):
+        for ind,row in direction_frame.iterrows():
+            if direction == 'right':
+                nose_y = row['ts_nose_y_cm'].astype(float)
+                port_y = np.nanmean([np.nanmean(row['leftportB_y_cm']),row['leftportT_y_cm']])
+                lateral_error = []
+                for i in nose_y:
+                    err = np.abs(i -port_y)
+                    lateral_error.append(err)
+                lateral_error = np.array(lateral_error)        
+                df.at[ind,'ts_lateral_error_to_target_port'] = lateral_error.astype(object) 
+            else:
+                nose_y = row['ts_nose_y_cm'].astype(float)
+                port_y = np.nanmean([np.nanmean(row['rightportB_y_cm']),row['rightportT_y_cm']])
+                lateral_error = []
+                for i in nose_y:
+                    err = np.abs(i -port_y)
+                    lateral_error.append(err)
+                lateral_error = np.array(lateral_error)        
+                df.at[ind,'ts_lateral_error_to_target_port'] = lateral_error.astype(object) 
+                
+def compute_obstacle_tortuosity_distance_threshold(df,thresh):
+    drop_nans_in_columns(df,'obstacle_ind')
+    for ind,row in df.iterrows():
+        nose_x = row.ts_nose_x_cm
+        nose_y = row.ts_nose_y_cm
+        try:
+            distance_thresh = np.argwhere(row.ts_distance_from_edge>=thresh).max()
+            obstacle_ind = int(row.obstacle_ind)
+        except ValueError:
+            continue
+        try:
+            thresh_tor, thresh_lin = compute_tortuosity(nose_x[distance_thresh:obstacle_ind],nose_y[distance_thresh:obstacle_ind])
+            df.at[ind,'ob_tortuosity'+'_'+str(thresh)] =thresh_tor
+            df.at[ind,'ob_linearity'+'_'+str(thresh)] = thresh_lin
+            df.at[ind,'percent_change_ob_tortuosity'+'_'+str(thresh)] =(thresh_tor - row.ob_tortuosity) * 100
+            df.at[ind,'percent_change_ob_linearity'+'_'+str(thresh)] = (thresh_lin - row.ob_linearity) * 100
+        except IndexError:
+            df.at[ind,'ob_tortuosity'+'_'+str(thresh)] =np.nan
+            df.at[ind,'ob_linearity'+'_'+str(thresh)] = np.nan
+            df.at[ind,'percent_change_ob_tortuosity'+'_'+str(thresh)] =np.nan
+            df.at[ind,'percent_change_ob_linearity'+'_'+str(thresh)] = np.nan
+
+def calculate_obstalce_and_edge_vector_angle(df,thresh,thresh1):
+    """only use long df"""
+    for ind,row in df.iterrows():
+        if row.obstacle_cluster == 0:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleBR_x_cm,row.gt_obstacleBR_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+
+            
+        elif row.obstacle_cluster == 1:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleBL_x_cm,row.gt_obstacleBL_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+        elif row.obstacle_cluster == 4:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleTR_x_cm,row.gt_obstacleTR_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+            
+        elif row.obstacle_cluster == 5:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleTL_x_cm,row.gt_obstacleTL_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+def calculate_obstalce_and_edge_vector_angle(df,thresh,thresh1):
+    """only use long df"""
+    for ind,row in df.iterrows():
+        if row.obstacle_cluster == 0:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleBR_x_cm,row.gt_obstacleBR_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+
+            
+        elif row.obstacle_cluster == 1:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleBL_x_cm,row.gt_obstacleBL_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+        elif row.obstacle_cluster == 4:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleTR_x_cm,row.gt_obstacleTR_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+            
+        elif row.obstacle_cluster == 5:
+            nose_x = row.ts_nose_x_cm
+            nose_y = row.ts_nose_y_cm
+            edge_x,edge_y = row.gt_obstacleTL_x_cm,row.gt_obstacleTL_y_cm
+            try:
+                distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+                distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+                if distance_thresh == distance_thresh1:
+                    continue
+                else:
+
+                    obstacle_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,nose_y[distance_thresh]))
+                    edge_vector = calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(edge_x,edge_y))
+                    mouse_vector=calculate_vector_between_points((nose_x[distance_thresh],nose_y[distance_thresh]),(nose_x[distance_thresh1],nose_y[distance_thresh1]))
+                    obstacle_rad,obstacle_ang = angle_between_vectors(mouse_vector,obstacle_vector)
+                    edge_rad,edge_ang =angle_between_vectors(mouse_vector,edge_vector)
+                    df.at[ind,'obstacle_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = obstacle_ang
+                    df.at[ind,'edge_vector_ang'+'_'+str(thresh)+'_'+str(thresh1)] = edge_ang
+            except ValueError:
+                continue
+            
+def variable_by_distance_threshold(df,var,thresh,thresh1):
+    for ind,row in df.iterrows(): 
+        try:
+            distance_thresh = np.argwhere(row.ts_distance_from_edge<=thresh).min()
+            distance_thresh1 = np.argwhere(row.ts_distance_from_edge<=thresh1).min()
+            if distance_thresh == distance_thresh1:
+                continue
+            else:
+                df.at[ind,var + '_'+str(thresh)+'_'+str(thresh1)] = row[var][distance_thresh:distance_thresh1]  
+                df.at[ind, var + '_' +str(thresh)+'_'+str(thresh1)+ '_mean'] = np.nanmean(row[var][distance_thresh:distance_thresh1])  
+        except ValueError:
+            continue  
+def calculate_quartiles(time_series_list):
+    quartiles = np.nanpercentile(time_series_list, [25, 50, 75], axis=0)
+    q1, median, q3 = quartiles[0], quartiles[1], quartiles[2]
+    iqr = q3 - q1
+    return median, q1, q3, iqr
+            
+        

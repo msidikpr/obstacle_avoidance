@@ -8,7 +8,7 @@ from obstacle_avoidance_processing import AvoidanceProcessing
 
 
 # metadata json path
-metadata_path = r"D:\obstacle_avoidance\metadata\J675\Training_J675.json"
+metadata_path = r"D:\obstacle_avoidance\metadata\SFN\G8CK_train_test.json"
 
 
 
@@ -20,7 +20,7 @@ task_name = 'non_obstalce'
 #task_name = 'oa'
 
 session = AvoidanceProcessing(metadata_path, task=task_name) 
-session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\no_obstacle_041723-Mike-2023-04-18\config.yaml")
+session.change_dlc_project(r"D:\obstacle_avoidance\deeplabcut\training_tracking_081424-Mike-2024-08-14\config.yaml")
 session.dlc_project
 session.preprocess()
 session.process()

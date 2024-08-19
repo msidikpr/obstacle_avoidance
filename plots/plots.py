@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd 
 import matplotlib.pyplot as plt 
 import numpy as np
-import xarray as xr
 import seaborn as sns
 import h5py as hf
 from tqdm import tqdm
@@ -30,6 +29,7 @@ from utils.base_functions import *
 from src.utils.auxiliary import flatten_series
 from src.utils.path import find
 from src.base import BaseInput
+
 
 
 
@@ -84,14 +84,14 @@ class plot_oa(BaseInput):
         for key in keys:
             for ind,row in self.df.iterrows():
                     self.df.at[ind,key] = np.mean(row[key])
-        for key in keys:
-            self.df[key] = self.df[key].mean()
+        #for key in keys:
+        #    self.df[key] = self.df[key].mean()
         """redo ts_body parts"""
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         for ind,row in self.df.iterrows():
             if row['odd']=='left':
                 nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>(self.df.leftportT_x_cm.unique()+5))
+                odd_ind = np.argmax(nose_list>(row.leftportT_x_cm+5))
                 ind_list =  list(range(len(row['nose_x_cm']))) 
                 ts_inds = ind_list[odd_ind:]
                 self.df.at[ind,'ts_inds'] = np.array(ts_inds).astype(object)
@@ -106,7 +106,7 @@ class plot_oa(BaseInput):
 
             else:
                 nose_list = row['nose_x_cm']
-                even_ind = np.argmax(nose_list<(self.df.rightportT_x_cm.unique()-5))
+                even_ind = np.argmax(nose_list<(row.rightportT_x_cm-5))
                 ind_list =  list(range(len(row['nose_x_cm']))) 
                 ts_inds = ind_list[even_ind:]
                 self.df.at[ind,'ts_inds'] = np.array(ts_inds).astype(object)
@@ -133,7 +133,7 @@ class plot_oa(BaseInput):
 
         """labe top or bottom start"""
         labels = ['top','bottom']
-        top_bottom = split_range_into_parts(pd.unique(self.df.arenaTL_y_cm).item(),pd.unique(self.df.arenaBL_y_cm).item(),2)
+        top_bottom = split_range_into_parts(np.nanmedian(pd.unique(self.df.arenaTL_y_cm)),np.nanmedian(pd.unique(self.df.arenaBL_y_cm)),2)
         top_bottom_dict = dict(zip(labels,top_bottom))
         for ind, row in self.df.iterrows():
             if top_bottom_dict.get('top')[0]<= np.nanmean(row['time_interp_ts_nose_y_cm'][:5]) <= top_bottom_dict.get('top')[1]:
@@ -339,8 +339,8 @@ class plot_oa(BaseInput):
 
 
 
-            get_mean_median_by_variable(self.df,'animal')
-            get_mean_median_by_variable(self.df,'date') 
+            #get_mean_median_by_variable(self.df,'animal')
+            #get_mean_median_by_variable(self.df,'date') 
         
         
         

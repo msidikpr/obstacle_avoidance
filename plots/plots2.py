@@ -5,14 +5,13 @@ from pathlib import Path
 import pandas as pd 
 import matplotlib.pyplot as plt 
 import numpy as np
-import xarray as xr
 import seaborn as sns
 import h5py as hf
 from tqdm import tqdm
 from tqdm import tqdm
 import itertools 
 from scipy.interpolate import interp1d
-from scipy import signal
+
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.cluster import KMeans
 import matplotlib.colors as mcolors
@@ -26,7 +25,7 @@ sys.path.insert(0, 'C:/Users/nlab/Documents/GitHub/obstacle_avoidance')
 
 from utils.base_functions import *
 
-#from plots.plots import *
+from plots.plots import *
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -717,185 +716,6 @@ def ts_angle_to_open_corner(df):
                                 df.at[ind,'ts_reye_angle_to_corner'] = np.nan
                                 df.at[ind,'ts_body_angle_to_corner'] = np.nan
 
-
-#def ts_angle_to_open_corner(df):
-#    """get angel of nose to open corner at a hold"""
-#    for direction, direction_frame in df.groupby(['odd']):
-#            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
-#                  for ind,row in cluster_frame.iterrows():
-#                        if direction == 'right':
-#                            if cluster == 0 or cluster == 1:
-#                                nose_x = row['ts_nose_x_cm'].astype(float)
-#                                nose_y = row['ts_nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleBR_x_cm']
-#                                corner_y = row['gt_obstacleBR_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                 df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                except ValueError:
-#                                    print(degs)
-#                                except IndexError:
-#                                    df.at[ind,'ts_angle_to_corner'] = np.nan
-#                            if cluster == 2 or cluster == 3:
-#                                    nose_x = row['ts_nose_x_cm'].astype(float)
-#                                    nose_y = row['ts_nose_y_cm'].astype(float)
-#                                    ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                    ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                    obstalce_edge= np.mean([row['gt_obstacleTR_x_cm'],row['gt_obstacleBR_x_cm']])
-#                                    nose_near_edge = nose_x[np.nanargmin(np.abs(np.array(nose_x) - obstalce_edge))]
-#                                    ind_nose_near_edge = np.argwhere(nose_x==nose_near_edge)[0][0]
-#                                    distance_to_top = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleTR_y_cm']))
-#                                    distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBR_y_cm']))
-#                                    if distance_to_top < distance_to_bottom:
-#                                        corner_x = row['gt_obstacleTR_x_cm']
-#                                        corner_y = row['gt_obstacleTR_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    if distance_to_top > distance_to_bottom:
-#                                        corner_x = row['gt_obstacleBR_x_cm']
-#                                        corner_y = row['gt_obstacleBR_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                    try:
-#                                        df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                    except IndexError:
-#                                        df.at[ind,'ts_angle_to_corner'] = np.nan
-#                                        
-#                                        
-#
-#                                        
-#                            if cluster == 4 or cluster == 5:
-#                                nose_x = row['ts_nose_x_cm'].astype(float)
-#                                nose_y = row['ts_nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleTR_x_cm']
-#                                corner_y = row['gt_obstacleTR_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'ts_angle_to_corner'] = np.nan
-#                                 
-#                        if direction == 'left':
-#                            if cluster == 0 or cluster == 1:
-#                                nose_x = row['ts_nose_x_cm'].astype(float)
-#                                nose_y = row['ts_nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleBL_x_cm']
-#                                corner_y = row['gt_obstacleBL_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'ts_angle_to_corner'] = np.nan
-#                            if cluster == 2 or cluster == 3:
-#                                    nose_x = row['ts_nose_x_cm'].astype(float)
-#                                    nose_y = row['ts_nose_y_cm'].astype(float)
-#                                    ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                    ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                    obstalce_edge= np.mean([row['gt_obstacleTL_x_cm'],row['gt_obstacleBL_x_cm']])
-#                                    nose_near_edge = nose_x[np.nanargmin(np.abs(np.array(nose_x) - obstalce_edge))]
-#                                    ind_nose_near_edge = np.argwhere(nose_x==nose_near_edge)[0][0]
-#                                    distance_to_top = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleTL_y_cm']))
-#                                    distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBL_y_cm']))
-#                                    if distance_to_top < distance_to_bottom:
-#                                        corner_x = row['gt_obstacleTL_x_cm']
-#                                        corner_y = row['gt_obstacleTL_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    if distance_to_top > distance_to_bottom:
-#                                        corner_x = row['gt_obstacleBL_x_cm']
-#                                        corner_y = row['gt_obstacleBL_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                    try:
-#                                        df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                    except IndexError:
-#                                        df.at[ind,'ts_angle_to_corner'] = np.nan
-#                                
-#                                
-#                            if cluster == 4 or cluster == 5:
-#                                nose_x = row['ts_nose_x_cm'].astype(float)
-#                                nose_y = row['ts_nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['ts_rightear_x_cm'],row['ts_leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['ts_rightear_y_cm'],row['ts_leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleTL_x_cm']
-#                                corner_y = row['gt_obstacleTL_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'ts_angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'ts_angle_to_corner'] = np.nan
 def angle_to_open_corner(df):
     """get angel of nose to open corner at a hold"""
     for direction, direction_frame in df.groupby(['odd']):
@@ -1294,7 +1114,7 @@ def angle_to_open_corner(df):
                         reye_degs = np.array(reye_degs)
                         body_degs = np.array(body_degs)
                         
-                        #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
+                
                         try:
                             df.at[ind,'angle_to_corner'] = degs.astype(object)
                             df.at[ind,'leye_angle_to_corner'] = leye_degs.astype(object)
@@ -1305,184 +1125,6 @@ def angle_to_open_corner(df):
                             df.at[ind,'leye_angle_to_corner'] = np.nan
                             df.at[ind,'reye_angle_to_corner'] = np.nan
                             df.at[ind,'body_angle_to_corner'] = np.nan
-#def angle_to_open_corner(df):
-#    """get angel of nose to open corner at a hold"""
-#    for direction, direction_frame in df.groupby(['odd']):
-#            for cluster, cluster_frame in direction_frame.groupby(['obstacle_cluster']):
-#                  for ind,row in cluster_frame.iterrows():
-#                        if direction == 'right':
-#                            if cluster == 0 or cluster == 1:
-#                                nose_x = row['nose_x_cm'].astype(float)
-#                                nose_y = row['nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleBR_x_cm']
-#                                corner_y = row['gt_obstacleBR_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                 df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                except ValueError:
-#                                    print(degs)
-#                                except IndexError:
-#                                    df.at[ind,'angle_to_corner'] = np.nan
-#                            if cluster == 2 or cluster == 3:
-#                                    nose_x = row['nose_x_cm'].astype(float)
-#                                    nose_y = row['nose_y_cm'].astype(float)
-#                                    ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                    ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                    obstalce_edge= np.mean([row['gt_obstacleTR_x_cm'],row['gt_obstacleBR_x_cm']])
-#                                    nose_near_edge = nose_x[np.nanargmin(np.abs(np.array(nose_x) - obstalce_edge))]
-#                                    ind_nose_near_edge = np.argwhere(nose_x==nose_near_edge)[0][0]
-#                                    distance_to_top = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleTR_y_cm']))
-#                                    distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBR_y_cm']))
-#                                    if distance_to_top < distance_to_bottom:
-#                                        corner_x = row['gt_obstacleTR_x_cm']
-#                                        corner_y = row['gt_obstacleTR_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    if distance_to_top > distance_to_bottom:
-#                                        corner_x = row['gt_obstacleBR_x_cm']
-#                                        corner_y = row['gt_obstacleBR_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                    try:
-#                                        df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                    except IndexError:
-#                                        df.at[ind,'angle_to_corner'] = np.nan
-#                                        
-#                                        
-#
-#                                        
-#                            if cluster == 4 or cluster == 5:
-#                                nose_x = row['nose_x_cm'].astype(float)
-#                                nose_y = row['nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleTR_x_cm']
-#                                corner_y = row['gt_obstacleTR_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'angle_to_corner'] = np.nan
-#                                 
-#                        if direction == 'left':
-#                            if cluster == 0 or cluster == 1:
-#                                nose_x = row['nose_x_cm'].astype(float)
-#                                nose_y = row['nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleBL_x_cm']
-#                                corner_y = row['gt_obstacleBL_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'angle_to_corner'] = np.nan
-#                            if cluster == 2 or cluster == 3:
-#                                    nose_x = row['nose_x_cm'].astype(float)
-#                                    nose_y = row['nose_y_cm'].astype(float)
-#                                    ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                    ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                    obstalce_edge= np.mean([row['gt_obstacleTL_x_cm'],row['gt_obstacleBL_x_cm']])
-#                                    nose_near_edge = nose_x[np.nanargmin(np.abs(np.array(nose_x) - obstalce_edge))]
-#                                    ind_nose_near_edge = np.argwhere(nose_x==nose_near_edge)[0][0]
-#                                    distance_to_top = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleTL_y_cm']))
-#                                    distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBL_y_cm']))
-#                                    if distance_to_top < distance_to_bottom:
-#                                        corner_x = row['gt_obstacleTL_x_cm']
-#                                        corner_y = row['gt_obstacleTL_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    if distance_to_top > distance_to_bottom:
-#                                        corner_x = row['gt_obstacleBL_x_cm']
-#                                        corner_y = row['gt_obstacleBL_y_cm']
-#                                        degs = []
-#                                        
-#                                        for i in list(range(len(nose_x))):
-#                                            vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                            vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                            rad,deg = angle_between_vectors(vector1,vector2)
-#                                            degs.append(deg)
-#                                            
-#                                        degs = np.array(degs)
-#                                    #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                    try:
-#                                        df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                    except IndexError:
-#                                        df.at[ind,'angle_to_corner'] = np.nan
-#                                
-#                                
-#                            if cluster == 4 or cluster == 5:
-#                                nose_x = row['nose_x_cm'].astype(float)
-#                                nose_y = row['nose_y_cm'].astype(float)
-#                                ear_x = np.mean([row['rightear_x_cm'],row['leftear_x_cm']],axis=0)
-#                                ear_y = np.mean([row['rightear_y_cm'],row['leftear_y_cm']],axis=0)
-#                                corner_x = row['gt_obstacleTL_x_cm']
-#                                corner_y = row['gt_obstacleTL_y_cm']
-#                                degs = []
-#                                
-#                                for i in list(range(len(nose_x))):
-#                                    vector1 = calculate_vector_between_points((ear_x[i],ear_y[i]),(nose_x[i],nose_y[i]))# vector from ear to nose
-#                                    vector2 = calculate_vector_between_points((ear_x[i],ear_y[i]),(corner_x,corner_y))# vector from nose to open corner
-#                                    rad,deg = angle_between_vectors(vector1,vector2)
-#                                    degs.append(deg)
-#                                    
-#                                degs = np.array(degs)
-#                                #df.at[ind,'angle_to_corner_' + str()] = degs.astype(object)
-#                                try:
-#                                    df.at[ind,'angle_to_corner'] = degs.astype(object)
-#                                except IndexError:
-#                                    df.at[ind,'angle_to_corner'] = np.nan
 
 
 def angle_to_target_port(df):
@@ -1709,7 +1351,7 @@ def lateral_error_open_corner(df):
                                 lateral_error.append(err)
                             
                         lateral_error = np.array(lateral_error)
-                        df.at[ind,'ts_lateral_error'] = lateral_error.astype(object)
+                        df.at[ind,'lateral_error'] = lateral_error.astype(object)
                         
                          
                 if direction == 'left':
@@ -1911,45 +1553,17 @@ def zero_out_angle_target_port(df):
             df.at[ind,'ts_zero_out_angle_to_target_port'] = ts_angle_array.astype(object)
         except:
             continue
-#def calculate_speed(df):
-#    for ind, row in df.iterrows():
-#        if row['odd'] == 'left': 
-#            nose_list = row['nose_x_cm'] 
-#            odd_ind = np.argmax(nose_list>(df.leftportT_x_cm.unique()+5))
-#            temp_time = np.diff(row['trial_timestamps'][odd_ind:])
-#        if row['odd'] == 'right':
-#            nose_list = row['nose_x_cm'] 
-#            even_ind = np.argmax(nose_list<(df.rightportT_x_cm.unique()-5))
-#            temp_time = np.diff(row['trial_timestamps'][even_ind:])
-#            #temp_time = np.diff(row['trial_timestamps'])
-#        x = np.diff(row['ts_nose_x_cm']); y = np.diff(row['ts_nose_y_cm'])
-#        if len(x) == len(temp_time):
-#            xspeed = list((x/temp_time)**2)
-#        elif len(x) > len(temp_time):
-#            xspeed = list((x[:len(temp_time)]/temp_time)**2)
-#        elif len(x) < len(temp_time):
-#            xspeed = list((x/temp_time[:len(x)])**2)
-#        if len(y) == len(temp_time):
-#            yspeed = list((y/temp_time)**2)
-#        elif len(y) > len(temp_time):
-#            yspeed = list((y[:len(temp_time)]/temp_time)**2)
-#        elif len(y) < len(temp_time):
-#            yspeed = list((y/temp_time[:len(y)])**2)
-#        df.at[ind, 'speed']  = np.sqrt(np.sum([xspeed, yspeed],axis=0)).astype(object)
-#        distance = np.sqrt((x.astype(float))**2) + np.sqrt((y.astype(float))**2)
-#        df.at[ind, 'distance'] = distance.astype(object)
-#        df.at[ind, 'total_distance'] = np.nansum(distance).astype(object)
 
-def calculate_speed(df):
+def calculate_speed(df): 
     for ind, row in df.iterrows():
         if row['odd'] == 'left': 
             nose_list = row['nose_x_cm'] 
-            ts_odd_ind = np.argmax(nose_list>(df.leftportT_x_cm.unique()+5))
+            ts_odd_ind = np.argmax(nose_list>(row.leftportT_x_cm+5))
             ts_temp_time = np.diff(row['trial_timestamps'][ts_odd_ind:])
             temp_time = np.diff(row['trial_timestamps'])
         if row['odd'] == 'right':
             nose_list = row['nose_x_cm'] 
-            ts_even_ind = np.argmax(nose_list<(df.rightportT_x_cm.unique()-5))
+            ts_even_ind = np.argmax(nose_list<(row.rightportT_x_cm-5))
             ts_temp_time = np.diff(row['trial_timestamps'][ts_even_ind:])
             temp_time = np.diff(row['trial_timestamps'])
             #temp_time = np.diff(row['trial_timestamps'])
@@ -2006,6 +1620,10 @@ def plot_trials_sample(df,sample):
     ax6 = fig.add_subplot(panel_1[2,1])
     plot_arena(df,ax6)
     right_axs = [ax1,ax2,ax3,ax4,ax5,ax6]
+    for axs in right_axs:
+        axs.set_xticks([])
+        axs.set_yticks([])
+
 
     """Left """
     panel_2 = gridspec.GridSpecFromSubplotSpec(3,2,subplot_spec=spec2[1])
@@ -2023,6 +1641,9 @@ def plot_trials_sample(df,sample):
     ax12 = fig.add_subplot(panel_2[2,1])
     plot_arena(df,ax12)
     left_axs = [ax7,ax8,ax9,ax10,ax11,ax12]
+    for axs in left_axs:
+        axs.set_xticks([])
+        axs.set_yticks([])
    
     
     
@@ -2042,59 +1663,18 @@ def plot_trials_sample(df,sample):
             for ind,row in cluster_frame.iterrows():
                 if direction == 'right':
                     which_axis = right_obstacle_dict.get(cluster)
-                    which_axis.plot(row['nose_x_cm'],row['nose_y_cm'],alpha = .5)
+                    #which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5)
+                    if row.start == 'top':
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5,c='red')
+                    else:
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5,c='blue')
                 if direction == 'left':
                     which_axis = left_obstacle_dict.get(cluster)
-                    which_axis.plot(row['nose_x_cm'],row['nose_y_cm'],alpha = .5)
-
-
-#def deveation(df):
-#    for ind,row in df.iterrows():
-#        obstacle_ind = int(np.argwhere(row.ts_distance_from_edge>= -2).max())
-#        goal_ind = int(np.argwhere(row.ts_distance_from_edge<= -2).min())
-#        df.at[ind,'obstacle_ind'] = obstacle_ind
-#        df.at[ind,'goal_ind'] = goal_ind#
-
-#        obstacle_basis_start_x, obstacle_basis_start_y = row.ts_nose_x_cm[0],row.ts_nose_y_cm[0]
-#        obstacle_basis_end_x, obstacle_basis_end_y = row.ts_nose_x_cm[obstacle_ind],row.ts_nose_y_cm[obstacle_ind]
-#        obstacle_basis_vector = calculate_vector_between_points((obstacle_basis_start_x,obstacle_basis_start_y),(obstacle_basis_end_x,obstacle_basis_end_y))
-#        obstacle_nose_x,obstacle_nose_y = row.ts_nose_x_cm[:obstacle_ind],row.ts_nose_y_cm[:obstacle_ind]
-#        df.at[ind,'obstacle_nose_x'] = obstacle_nose_x.astype(object)
-#        df.at[ind,'obstacle_nose_y'] = obstacle_nose_y.astype(object)
-#        df.at[ind,'obstacle_basis_start_x'] = row.ts_nose_x_cm[0]
-#        df.at[ind,'obstacle_basis_start_y'] = row.ts_nose_y_cm[0]
-#        df.at[ind,'obstacle_basis_end_x'] = row.ts_nose_y_cm[obstacle_ind]
-#        df.at[ind,'obstacle_basis_end_y'] = row.ts_nose_y_cm[obstacle_ind]#
-#
-
-#        goal_basis_start_x, goal_basis_start_y = row.ts_nose_x_cm[goal_ind],row.ts_nose_y_cm[goal_ind]
-#        goal_basis_end_x, goal_basis_end_y = row.ts_nose_x_cm[-1],row.ts_nose_y_cm[-1]
-#        goal_basis_vector = calculate_vector_between_points((goal_basis_start_x,goal_basis_start_y),(goal_basis_end_x,goal_basis_end_y))
-#        goal_nose_x,goal_nose_y = row.ts_nose_x_cm[goal_ind:],row.ts_nose_y_cm[goal_ind:]
-#        df.at[ind,'goal_nose_x'] = goal_nose_x.astype(object)
-#        df.at[ind,'goal_nose_y'] = goal_nose_y.astype(object)
-#        df.at[ind,'goal_basis_start_x'] = row.ts_nose_x_cm[goal_ind]
-#        df.at[ind,'goal_basis_start_y'] = row.ts_nose_y_cm[goal_ind]
-#        df.at[ind,'goal_basis_end_x'] = row.ts_nose_y_cm[-1]
-#        df.at[ind,'goal_basis_end_y'] = row.ts_nose_y_cm[-1]#
-
-#        obstacle_devations = []
-#        for i in list(range(len(obstacle_nose_x))):
-#            obstacle_nose_vector = calculate_vector_between_points((obstacle_basis_start_x,obstacle_basis_start_y),(obstacle_nose_x[i],obstacle_nose_y[i]))
-#            _,dev = angle_between_vectors(obstacle_nose_vector,obstacle_basis_vector)
-#            #devations.append(dev) 
-#            #dev = calculate_angle((nose_x[i],nose_y[i]),(origin_x,origin_y),(end_x,end_y))
-#            obstacle_devations.append(dev)
-#        df.at[ind,'obstacle_devations'] = np.array(obstacle_devations).astype(object)
-#        
-#        goal_devations = []
-#        for i in list(range(len(goal_nose_x))):
-#            goal_nose_vector = calculate_vector_between_points((goal_basis_start_x,goal_basis_start_y),(goal_nose_x[i],goal_nose_y[i]))
-#            _,dev = angle_between_vectors(goal_nose_vector,goal_basis_vector)
-#            #devations.append(dev) 
-#            #dev = calculate_angle((nose_x[i],nose_y[i]),(origin_x,origin_y),(end_x,end_y))
-#            goal_devations.append(dev)
-#        df.at[ind,'goal_devations'] = np.array(goal_devations).astype(object)
+                    #which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5)
+                    if row.start == 'top':
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5,c='red')
+                    else:
+                        which_axis.plot(row['ts_nose_x_cm'],row['ts_nose_y_cm'],alpha = .5,c='blue')
 
 def deveation(df):
     for ind,row in df.iterrows():
@@ -2150,10 +1730,11 @@ def deveation(df):
             goal_devations.append(dev)
         df.at[ind,'goal_devations'] = np.array(goal_devations).astype(object)
 
-def get_mean_of_df( df,key:str, bins:int):
+def get_mean_of_df( df,key:str, bins:int,matx = False):
         fake_time = np.linspace(0,1,bins)
         mat = np.zeros([len(df), bins])
         count = 0
+        df = drop_nans_in_columns(df,key)
         for ind, row in df.iterrows():
             xT = np.linspace(0,1,len(row[key]))
             mat[count,:] = interp1d(xT, row[key], bounds_error=False)(fake_time)
@@ -2162,14 +1743,22 @@ def get_mean_of_df( df,key:str, bins:int):
 
         df = pd.Series(mean)
         df.fillna(method='bfill', axis=0, inplace=True)
+        df.fillna(method='ffill', axis=0, inplace=True)
         mean = df.to_numpy()
+        if matx == True:
 
-        return mean
+            return mean,mat
+        else:
+            return mean
 
-def get_median_of_df( df,key:str, bins:int):
+
+
+
+def get_median_of_df( df,key:str, bins:int,matx = False):
         fake_time = np.linspace(0,1,bins)
         mat = np.zeros([len(df), bins])
         count = 0
+        df = drop_nans_in_columns(df,key)
         for ind, row in df.iterrows():
             xT = np.linspace(0,1,len(row[key]))
             mat[count,:] = interp1d(xT, row[key], bounds_error=False)(fake_time)
@@ -2178,13 +1767,17 @@ def get_median_of_df( df,key:str, bins:int):
 
         df = pd.Series(median)
         df.fillna(method='bfill', axis=0, inplace=True)
+        df.fillna(method='ffill', axis=0, inplace=True)
         median = df.to_numpy()
-        
-        return median
+        if matx == True:
+
+            return median,mat
+        else:
+            return median
 def goal_and_obstacle_tortuosity(df):
     for ind,row in df.iterrows():
         try:
-            ob_tor,ob_lin= compute_tortuosity(row['obstacle_nose_x'],row['obstacle_nose_y'])
+            ob_tor,ob_lin= Path(row['obstacle_nose_x'],row['obstacle_nose_y'])
             df.at[ind,'ob_tortuosity']=ob_tor
             df.at[ind,'ob_linearity']=ob_lin
 
@@ -2199,10 +1792,10 @@ def goal_and_obstacle_tortuosity(df):
             df.at[ind,'go_linearity']=np.nan
 def head_body_angle(df):
     for ind,row in df.iterrows():
-        nose_x,nose_y = row.nose_x_cm,row.nose_y_cm 
-        ear_x, ear_y = np.mean([row.leftear_x_cm, row.rightear_x_cm],axis=0) ,np.mean([row.leftear_y_cm, row.rightear_y_cm],axis=0) 
-        spine_x, spine_y = row.spine_x_cm,row.spine_y_cm 
-        tailbase_x, tailbase_y = row.tailbase_x_cm,row.tailbase_y_cm 
+        nose_x,nose_y = row.ts_nose_x_cm,row.ts_nose_y_cm 
+        ear_x, ear_y = np.mean([row.ts_leftear_x_cm, row.ts_rightear_x_cm],axis=0) ,np.mean([row.ts_leftear_y_cm, row.ts_rightear_y_cm],axis=0) 
+        spine_x, spine_y = row.ts_spine_x_cm,row.ts_spine_y_cm 
+        tailbase_x, tailbase_y = row.ts_tailbase_x_cm,row.ts_tailbase_y_cm 
 
         degs = []
         for i in list(range(len(nose_x))):
@@ -2211,4 +1804,4 @@ def head_body_angle(df):
             rad,deg = angle_between_vectors(head_vector.astype(float),body_vector.astype(float))
             degs.append(deg)
         degs = np.array(degs)
-        df.at[ind,'head_body_angle'] = degs.astype(object)
+        df.at[ind,'ts_head_body_angle'] = degs.astype(object)
