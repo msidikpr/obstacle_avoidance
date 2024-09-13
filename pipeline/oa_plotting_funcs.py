@@ -92,15 +92,15 @@ def plot_orginal_obstacle(df,axis,cluster, correct = False, corect_x= 0,corect_y
     keys = [key for key in keys if 'cen' not in key]
     for key in keys:
         df.loc[df.obstacle_cluster ==cluster,key] = df.loc[df.obstacle_cluster ==cluster,key].median()
-    obstacle_x = pd.unique(df[['gt_obstacleTL_x_cm',
-        'gt_obstacleTR_x_cm','gt_obstacleBR_x_cm',
-        'gt_obstacleBL_x_cm',
-        'gt_obstacleTL_x_cm']].values.ravel('K'))
+    obstacle_x = df[['gt_obstacleTL_x_cm',
+        'gt_obstacleTR_x_cm','gt_obstacleTR_x_cm',
+        'gt_obstacleTL_x_cm',
+        'gt_obstacleTL_x_cm']].median().values.ravel('K')
 
-    obstacle_y =  pd.unique(df[['gt_obstacleTL_y_cm',
-    'gt_obstacleTR_y_cm','gt_obstacleBR_y_cm',
+    obstacle_y =  df[['gt_obstacleTL_y_cm',
+    'gt_obstacleTL_y_cm','gt_obstacleBL_y_cm',
     'gt_obstacleBL_y_cm',
-    'gt_obstacleTL_y_cm']].values.ravel('K'))
+    'gt_obstacleTL_y_cm']].median().values.ravel('K')
 
     if correct == False:
         axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
@@ -112,14 +112,14 @@ def plot_orginal_obstacle(df,axis,cluster, correct = False, corect_x= 0,corect_y
         axis.set_ylim([51,0]); axis.set_xlim([0, 61])
 
 def plot_obstacle_from_row(axis,row):
-    obstacle_x = [row[1].gt_obstacleTL_x_cm,
-        row[1].gt_obstacleTR_x_cm,row[1].gt_obstacleTR_x_cm,
-        row[1].gt_obstacleTL_x_cm,
-        row[1].gt_obstacleTL_x_cm]
-    obstacle_y = [row[1].gt_obstacleTL_y_cm,
-        row[1].gt_obstacleTL_y_cm,row[1].gt_obstacleBL_y_cm,
-        row[1].gt_obstacleBL_y_cm,
-        row[1].gt_obstacleTL_y_cm]
+    obstacle_x = [row.gt_obstacleTL_x_cm,
+        row.gt_obstacleTR_x_cm,row.gt_obstacleTR_x_cm,
+        row.gt_obstacleTL_x_cm,
+        row.gt_obstacleTL_x_cm]
+    obstacle_y = [row.gt_obstacleTL_y_cm,
+        row.gt_obstacleTL_y_cm,row.gt_obstacleBL_y_cm,
+        row.gt_obstacleBL_y_cm,
+        row.gt_obstacleTL_y_cm]
     
     axis.plot([obstacle_x[0],obstacle_x[1],obstacle_x[2],obstacle_x[3],obstacle_x[0]],
                               [obstacle_y[0],obstacle_y[1],obstacle_y[2],obstacle_y[3],obstacle_y[0]],c='k')

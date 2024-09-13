@@ -410,7 +410,6 @@ class AvoidanceSession(BaseInput):
         
 
         self.data['time'] = self.data['len']/60
-        self.data.to_hdf(os.path.join(self.session_path,('non_obstacle' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         #session = plot_oa('empty',self.data)
         #session.train_day_summary()
         #train_day_summary_df(self.data)
@@ -480,9 +479,6 @@ class AvoidanceSession(BaseInput):
         #trail start = ts
         ##odd tiral at 16 cm even at 56 cm     
         for ind, row in self.data.iterrows(): 
-            """interpolate and smooth key points
-                interpolate across nans 
-                gausian smooth sigma 3 """
             if row['odd'] == 'left':
                 nose_list = row['nose_x_cm'] 
                 odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5))

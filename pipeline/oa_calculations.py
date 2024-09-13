@@ -5,8 +5,9 @@ import numpy as np
 import itertools 
 from sklearn.cluster import KMeans
 from scipy.ndimage import gaussian_filter
-from pipeline.helper_functions import list_columns,interpolate_array,split_range_into_parts
+from pipeline.helper_functions import list_columns,interpolate_array,split_range_into_parts,largest_sequentially_increasing_by_one_subarray
 import copy
+from scipy.signal import find_peaks
 
 def calculate_distances(x_points, y_points, x_reference, y_reference):
     """
@@ -1663,10 +1664,11 @@ def get_head_angle(df):
 def angular_velocity_head(df):
     for ind,row in df.iterrows():
         #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
-        df.at[ind,'head_angle_velocity'] = calculate_angular_velocity(row.head_angle.astype(float),60).astype(object)
-        
+        head_angle_velocity = calculate_angular_velocity(row.head_angle.astype(float),60).astype(object)
+        df.at[ind,'head_angle_velocity'] = head_angle_velocity
+        df.at[ind,'intial_head_angle_velocity'] = head_angle_velocity.astype(float)[np.isfinite(head_angle_velocity.astype(float))][0]
+
 def calculate_angular_velocity(angles, frame_rate):
-    """positive is """
     # Convert angles to radians if they are given in degrees
     angles = np.radians(angles)
 
@@ -1675,6 +1677,7 @@ def calculate_angular_velocity(angles, frame_rate):
     angular_velocities = angular_displacements / (1 / frame_rate)
     np.angle(angular_velocities.astype(float))
     return angular_velocities
+
 
 def head_angle_velocity(df):
     """calculate the egocentric head angle and velocity"""
@@ -1687,9 +1690,9 @@ def start(df):
     top_bottom = split_range_into_parts(np.nanmedian(pd.unique(df.arenaTL_y_cm)),np.nanmedian(pd.unique(df.arenaBL_y_cm)),2)
     top_bottom_dict = dict(zip(labels,top_bottom))
     for ind, row in df.iterrows():
-        if top_bottom_dict.get('top')[0]<= np.nanmean(row['ts_nose_y_cm'][:5]) <= top_bottom_dict.get('top')[1]:
+        if top_bottom_dict.get('top')[0]<= np.nanmean(row['ts_nose_y_cm'][:20]) <= top_bottom_dict.get('top')[1]:
             df.at[ind,'start'] = 'top'
-        if top_bottom_dict.get('bottom')[0]<= np.nanmean(row['ts_nose_y_cm'][:5]) <= top_bottom_dict.get('bottom')[1]:
+        if top_bottom_dict.get('bottom')[0]<= np.nanmean(row['ts_nose_y_cm'][:20]) <= top_bottom_dict.get('bottom')[1]:
             df.at[ind,'start'] = 'bottom'
         if np.nanmean(row['ts_nose_y_cm'][:5]) == np.nan:
             df.drop(df.iloc[ind])
@@ -1729,14 +1732,209 @@ def calculate_speed(df):
             yspeed = list((y/temp_time[:len(y)])**2)
             ts_yspeed = list((ts_y/ts_temp_time[:len(ts_y)])**2)
 
-        df.at[ind, 'speed']  = np.sqrt(np.sum([xspeed, yspeed],axis=0)).astype(object)
-        df.at[ind, 'ts_speed']  = np.sqrt(np.sum([ts_xspeed, ts_yspeed],axis=0)).astype(object)
+        df.at[ind, 'speed']  = gaussian_filter(np.sqrt(np.sum([xspeed, yspeed],axis=0)),3).astype(object)
+        df.at[ind, 'ts_speed']  = gaussian_filter(np.sqrt(np.sum([ts_xspeed, ts_yspeed],axis=0)),3).astype(object)
         distance = np.sqrt((x.astype(float))**2) + np.sqrt((y.astype(float))**2)
         ts_distance = np.sqrt((ts_x.astype(float))**2) + np.sqrt((ts_y.astype(float))**2)
         df.at[ind, 'distance'] = distance.astype(object)
         df.at[ind, 'ts_distance'] = ts_distance.astype(object)
         df.at[ind, 'total_distance'] = np.nansum(distance).astype(object)
         df.at[ind, 'ts_total_distance'] = np.nansum(ts_distance).astype(object)
+
+
+def angular_velocity_head(df):
+    for ind,row in df.iterrows():
+        #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
+        head_angle_velocity = calculate_angular_velocity(row.head_angle.astype(float),60).astype(object)
+        df.at[ind,'head_angle_velocity'] = head_angle_velocity
+        df.at[ind,'intial_head_angle_velocity'] = head_angle_velocity.astype(float)[np.isfinite(head_angle_velocity.astype(float))][0]
+
+def calculate_angular_velocity(angles, frame_rate):
+    # Convert angles to radians if they are given in degrees
+    angles = np.radians(angles)
+
+    # Calculate angular velocity using NumPy's array operations
+    angular_displacements = np.diff(angles)
+    angular_velocities = angular_displacements / (1 / frame_rate)
+    np.angle(angular_velocities.astype(float))
+    return angular_velocities
+
+
+#def turn_direction(df):
+#    for ind,row in df.iterrows():
+#        if np.nanmean(row.head_angle_velocity[:5]) < 0:
+#            df.at[ind,'turn_direction'] = 'up'
+#        elif np.nanmean(row.head_angle_velocity[:5])> 0:
+#            df.at[ind,'turn_direction'] = 'down'
+
+def turn_direction(df):
+    for ind,row in df.iterrows():
+        peaks, _ = find_peaks(np.abs(row.head_angle_velocity), height=(1,10))
+        head_direction = row.head_angle_velocity[peaks[0]]
+        
+        if head_direction < 0:
+            df.at[ind,'turn_direction'] = 'up'
+        elif head_direction> 0:
+            df.at[ind,'turn_direction'] = 'down'
+
+
+def turn_to_obstacle(df):
+    for ind,row in df.iterrows():
+        if (row.obstacle_cluster ==  2) or  (row.obstacle_cluster ==  3):
+            if (row.start=='top') & (row.turn_direction=='up'):
+                df.at[ind,'turn_to_obstacle'] = 'away'
+            if (row.start=='top') & (row.turn_direction=='down'):
+                df.at[ind,'turn_to_obstacle'] = 'towards'
+            if (row.start=='bottom') & (row.turn_direction=='down'):
+                df.at[ind,'turn_to_obstacle'] = 'away'
+            if (row.start=='bottom') & (row.turn_direction=='up'):
+                df.at[ind,'turn_to_obstacle'] = 'towards'
+        elif (row.obstacle_cluster ==  0) or  (row.obstacle_cluster ==  1):
+            if row.turn_direction == 'up':
+                df.at[ind,'turn_to_obstacle'] = 'towards'
+            else:
+                df.at[ind,'turn_to_obstacle'] = 'away'
+        elif (row.obstacle_cluster ==  4) or  (row.obstacle_cluster ==  5):
+            if row.turn_direction == 'up':
+                df.at[ind,'turn_to_obstacle'] = 'away'
+            else:
+                df.at[ind,'turn_to_obstacle'] = 'towards'
+
+
+
+def redo_ts_trace(df,thresh = 5):
+    "correct for tracking jitter"
+    
+    #points = ['ts_nose_x','ts_nose_y','ts_nose_x_cm','ts_nose_y_cm','ts_leftear_x','ts_leftear_y','ts_leftear_x_cm','ts_leftear_y_cm','ts_rightear_x',
+    #              'ts_rightear_y','ts_rightear_x_cm','ts_rightear_y_cm','ts_spine_x','ts_spine_y','ts_midspine_x','ts_midspine_y','ts_spine_x_cm','ts_spine_y_cm','ts_midspine_x_cm',
+    #             'ts_midspine_y_cm','ts_midspine_x','ts_midspine_y','ts_midspine_x_cm','ts_midspine_y_cm','ts_tailbase_x','ts_tailbase_y','ts_tailbase_x_cm','ts_tailbase_y_cm',]
+    #for ind, row in df.iterrows():
+    #    diff_array = np.diff(np.round(np.diff(row.ts_nose_y_cm).astype(float),5))
+    #    zero_inds = np.argwhere(diff_array == 0).flatten()
+    #    drop_inds = largest_sequentially_increasing_by_one_subarray(zero_inds)
+#
+    # 
+#
+    #    if len(drop_inds) <=thresh:
+    #        continue
+    #    else:
+    #        if row.odd == 'left':
+    #            nose =  row['ts_nose_x_cm'][drop_inds[-1]:]
+    #            odd_ind = np.argmax(nose>(row.leftportT_x_cm+5))
+    #            for point in points:
+    #                df.at[ind,point] = row[point][drop_inds[-1]:][odd_ind:].astype(object)
+    #        elif row.odd == 'right':
+    #            nose =  row['ts_nose_x_cm'][drop_inds[-1]:]
+    #            even_ind = np.argmax(nose<(row.rightportT_x_cm-5))
+    #            for point in points:
+#
+    #                df.at[ind,point] = row[point][drop_inds[-1]:][even_ind:].astype(object)
+    #heading_calcs(df)
+    #distance_calcs(df)
+    #deveation(df)
+    #lateral_error(df)
+    #df_tortuosity(df)
+    #head_angle_velocity(df)
+    #turn_direction(df)
+    #turn_to_obstacle(df)
+
+    thresh = 1 
+    points = ['ts_nose_x','ts_nose_y','ts_nose_x_cm','ts_nose_y_cm','ts_leftear_x','ts_leftear_y','ts_leftear_x_cm','ts_leftear_y_cm','ts_rightear_x',
+                      'ts_rightear_y','ts_rightear_x_cm','ts_rightear_y_cm','ts_spine_x','ts_spine_y','ts_midspine_x','ts_midspine_y','ts_spine_x_cm','ts_spine_y_cm','ts_midspine_x_cm',
+                     'ts_midspine_y_cm','ts_midspine_x','ts_midspine_y','ts_midspine_x_cm','ts_midspine_y_cm','ts_tailbase_x','ts_tailbase_y','ts_tailbase_x_cm','ts_tailbase_y_cm',]
+
+    for ind, row in df.iterrows():
+
+        drop_inds = np.argwhere(np.round(np.abs(np.diff(np.diff(row.ts_nose_y_cm).astype(float)))) > 1).flatten()
+
+    
+        if len(drop_inds) <=thresh:
+            continue
+        else:
+            if row.odd == 'left':
+                nose =  row['ts_nose_x_cm'][drop_inds[-1]+1:]
+                odd_ind = np.argmax(nose>(row.leftportT_x_cm+5))
+                for point in points:
+                    df.at[ind,point] = row[point][drop_inds[-1]+1:][odd_ind:].astype(object)
+            elif row.odd == 'right':
+                nose =  row['ts_nose_x_cm'][drop_inds[-1]+1:]
+                even_ind = np.argmax(nose<(row.rightportT_x_cm-5))
+                for point in points:
+                    df.at[ind,point] = row[point][drop_inds[-1]+1:][even_ind:].astype(object)
+    heading_calcs(df)
+    distance_calcs(df)
+    deveation(df)
+    lateral_error(df)
+    df_tortuosity(df)
+    head_angle_velocity(df)
+    turn_direction(df)
+
+
+def intial_lateral_error(df):
+    for ind,row in df.iterrows():
+        if type(row.lateral_error)==float:
+            df.at[ind,'intial_lateral_error'] = np.nan
+        else:
+            df.at[ind,'intial_lateral_error'] = row.lateral_error[0]
+         
+def avg_lateral_error(df):
+    for ind,row in df.iterrows():
+        if type(row.lateral_error)==float:
+            df.at[ind,'avg_lateral_error'] = np.nan
+        else:
+            df.at[ind,'avg_lateral_error'] = np.nanmean(row.lateral_error[:int(row.obstacle_ind)])
+def check_trial_for_obstalce_cross(row): 
+    """function checks if the trail trace crosses through the obsacle and returns boolean
+    True is dose not cross through obstacle. False mean at least one point is inside the obstalce"""
+    
+    obstacle_x = [row['gt_obstacleTL_x_cm'],row['gt_obstacleTR_x_cm'],row['gt_obstacleBR_x_cm'],row['gt_obstacleBL_x_cm']]
+    obstacle_y = [row['gt_obstacleTL_y_cm'],row['gt_obstacleTR_y_cm'],row['gt_obstacleBR_y_cm'],row['gt_obstacleBL_y_cm']]
+    nose_x = row['nose_x_cm'].astype(float)
+    nose_y = row['nose_y_cm'].astype(float)
+
+    def are_points_inside_polygon(x_points, y_points, obstacle_x, obstacle_y):
+        n = len(obstacle_x)
+        results = []
+
+        for x, y in zip(x_points, y_points):
+            inside = False
+            p1x, p1y = obstacle_x[0], obstacle_y[0]
+
+            for i in range(n + 1):
+                p2x, p2y = obstacle_x[i % n], obstacle_y[i % n]
+                if y > min(p1y, p2y):
+                    if y <= max(p1y, p2y):
+                        if x <= max(p1x, p2x):
+                            if p1y != p2y:
+                                xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                            if p1x == p2x or x <= xinters:
+                                inside = not inside
+                p1x, p1y = p2x, p2y
+
+            results.append(inside)
+        return results
+    results = are_points_inside_polygon(nose_x,nose_y,obstacle_x,obstacle_y)
+    if sum(results) == 0:
+        return True  
+    else:
+        return False
+def check_trial_for_obstalce_cross_df(df):
+    for ind,row in df.iterrows():
+        df.at[ind,'obstacle_cross'] = check_trial_for_obstalce_cross(row)
+
+
+def angular_velocity_head_corner(df):
+    for ind,row in df.iterrows():
+        #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
+        trace = gaussian_filter(np.array((row.ts_zero_out_angle_to_corner.astype(float))),3,mode = 'reflect').astype(object)
+        
+        df.at[ind,'head_corner_angle_velocity'] = calculate_angular_velocity(trace.astype(float),60).astype(object)
+def distance_at_head_turn(df):
+    for ind,row in df.iterrows():
+        thresh = row.head_corner_angle_velocity[:int(row.obstacle_ind)].argmin()
+        df.at[ind,'distance_at_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][thresh]
+
+        
 
 
 

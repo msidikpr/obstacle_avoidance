@@ -55,7 +55,6 @@ class plot_oa(BaseInput):
         hf_list = list(itertools.chain(*hf_list))
         for h5 in hf_list:
             data = pd.read_hdf(h5)
-            print(data)
             df=df.append(data,ignore_index=False)
         self.df=df
         self.df['orginal_index'] = self.df.index

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools 
 from scipy.interpolate import interp1d
+import seaborn as sns
+from scipy.ndimage import gaussian_filter
 
 
 def list_columns(df,keys): 
@@ -226,6 +228,7 @@ def find_consecutive_repeats(series):
     Used to find trials that have repeat of the same  obstacle location
     """
     consecutive_repeats = []
+    edit_list = []
     count = 1
     prev_value = None
 
@@ -242,6 +245,11 @@ def find_consecutive_repeats(series):
 
         if count >= 3:
             consecutive_repeats.append((index - count+1, index, value,count))
+    consecutive_repeats = np.asarray(consecutive_repeats)
+    for i,row in enumerate(consecutive_repeats):
+        edit_list.append(consecutive_repeats[consecutive_repeats[:,0] == row[0]][-1]) 
+    edit_array = np.asarray(edit_list)
+    edit_array = np.unique(edit_array,axis=0)
     
  
     #for count,row in enumerate(consecutive_repeats):
@@ -249,7 +257,7 @@ def find_consecutive_repeats(series):
     #        del consecutive_repeats[count]
     
 
-    return consecutive_repeats
+    return edit_array
 
 def assign_date_index(df, train = False):
     '''assign dates with index 0 == first day'''
@@ -274,7 +282,78 @@ def edge_outliers(array,thresh):
     "take out edege outliers in interpolations"
     diff = np.diff(array)
     if np.abs(diff[-1]) > thresh:
-        array[-1] = array[-2]
+        array[-1] = (array[-2] * 1.25)
     else:
         array = array
     return array
+
+
+def create_df_by_type_nostart(df):
+    '''creates df of only long aprochaes'''
+    cluster_0_long = df[(df['obstacle_cluster']==0)&(df['odd']== 'right')]
+    cluster_1_long = df[(df['obstacle_cluster']==1)&(df['odd']== 'left')]
+    cluster_4_long = df[(df['obstacle_cluster']==4)&(df['odd']== 'right')]
+    cluster_5_long = df[(df['obstacle_cluster']==5)&(df['odd']== 'left')]
+
+    cluster_0_short = df[(df['obstacle_cluster']==0)&(df['odd']== 'left')]
+    cluster_1_short = df[(df['obstacle_cluster']==1)&(df['odd']== 'right')]
+    cluster_4_short = df[(df['obstacle_cluster']==4)&(df['odd']== 'left')]
+    cluster_5_short = df[(df['obstacle_cluster']==5)&(df['odd']== 'right')]
+
+    cluster_2 = df[(df['obstacle_cluster']==2)]
+    cluster_3 = df[(df['obstacle_cluster']==3)]
+
+    
+    
+
+    long_df = pd.concat([cluster_0_long,cluster_1_long,cluster_4_long,cluster_5_long])
+    short_df = pd.concat([cluster_0_short,cluster_1_short,cluster_4_short,cluster_5_short])
+    middle_df = pd.concat([cluster_2,cluster_3])
+    return long_df,short_df,middle_df
+
+
+def largest_sequentially_increasing_by_one_subarray(arr):
+    max_len = 1  # To store the length of the largest sequential segment
+    max_start = 0  # To store the start index of the largest segment
+    start = 0  # Start index of the current sequential segment
+
+    # Iterate over the array to find sequentially increasing by 1 segments
+    for i in range(1, len(arr)):
+        # If the current element is not exactly 1 greater than the previous one
+        if arr[i] != arr[i - 1] + 1:
+            # Calculate the length of the current segment
+            length = i - start
+            if length > max_len:
+                max_len = length
+                max_start = start
+            # Start a new segment from the current element
+            start = i
+
+    # Handle the case if the largest segment is at the end of the array
+    if len(arr) - start > max_len:
+        max_start = start
+        max_len = len(arr) - start
+
+    # Return the largest sequentially increasing by 1 subarray
+    return arr[max_start:max_start + max_len]
+
+def create_color_dict(df,key,color_pallete,sort =False):
+    if sort == True:
+        color_labels = df[key].unique().astype(int)
+        color_labels.sort()
+        color_labels = color_labels.astype(str)
+        rgb_values = sns.color_palette(color_pallete, len(color_labels))
+        color_map = dict(zip(color_labels, rgb_values))
+        color_map = {'0'+k: v for k, v in color_map.items()}
+
+
+
+    else:    
+        color_labels = df[key].unique().astype(str)
+        rgb_values = sns.color_palette(color_pallete, len(color_labels))
+        color_map = dict(zip(color_labels, rgb_values))
+    return color_map
+
+def smooth(points,sigma = 3):
+    filtered = gaussian_filter(points.astype(float),sigma = sigma)
+    return filtered
