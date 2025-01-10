@@ -315,7 +315,7 @@ def ts_angle_to_open_corner(df):
                     if direction == 'right':
                         if cluster == 0 or cluster == 1:
                             corner_x = row['gt_obstacleBR_x_cm']
-                            corner_y = row['gt_obstacleBR_y_cm']
+                            corner_y = row['gt_obstacleBR_y_cm']+2
                             degs = []
                             
                             reye_degs = []
@@ -377,7 +377,7 @@ def ts_angle_to_open_corner(df):
                                 distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBR_y_cm']))
                                 if distance_to_top < distance_to_bottom:
                                     corner_x = row['gt_obstacleTR_x_cm']
-                                    corner_y = row['gt_obstacleTR_y_cm']
+                                    corner_y = row['gt_obstacleTR_y_cm']-2
                                     degs = []
                                     
                                     reye_degs = []
@@ -415,7 +415,7 @@ def ts_angle_to_open_corner(df):
                                     
                                 if distance_to_top > distance_to_bottom:
                                     corner_x = row['gt_obstacleBR_x_cm']
-                                    corner_y = row['gt_obstacleBR_y_cm']
+                                    corner_y = row['gt_obstacleBR_y_cm']+2
                                     degs = []
                                     
                                     reye_degs = []
@@ -466,7 +466,7 @@ def ts_angle_to_open_corner(df):
                                     
                         if cluster == 4 or cluster == 5:
                             corner_x = row['gt_obstacleTR_x_cm']
-                            corner_y = row['gt_obstacleTR_y_cm']
+                            corner_y = row['gt_obstacleTR_y_cm']-2
                             degs = []
                             
                             reye_degs = []
@@ -516,7 +516,7 @@ def ts_angle_to_open_corner(df):
                     if direction == 'left':
                         if cluster == 0 or cluster == 1:
                             corner_x = row['gt_obstacleBL_x_cm']
-                            corner_y = row['gt_obstacleBL_y_cm']
+                            corner_y = row['gt_obstacleBL_y_cm']+2
                             degs = []
                             
                             reye_degs = []
@@ -569,7 +569,7 @@ def ts_angle_to_open_corner(df):
                                 distance_to_bottom = np.abs(calculate_distances(nose_x[ind_nose_near_edge],nose_y[ind_nose_near_edge],obstalce_edge,row['gt_obstacleBL_y_cm']))
                                 if distance_to_top < distance_to_bottom:
                                     corner_x = row['gt_obstacleTL_x_cm']
-                                    corner_y = row['gt_obstacleTL_y_cm']
+                                    corner_y = row['gt_obstacleTL_y_cm']-2
                                     degs = []
                                     
                                     reye_degs = []
@@ -606,7 +606,7 @@ def ts_angle_to_open_corner(df):
                                     
                                 if distance_to_top > distance_to_bottom:
                                     corner_x = row['gt_obstacleBL_x_cm']
-                                    corner_y = row['gt_obstacleBL_y_cm']
+                                    corner_y = row['gt_obstacleBL_y_cm']+2
                                     degs = []
                                     
                                     reye_degs = []
@@ -656,7 +656,7 @@ def ts_angle_to_open_corner(df):
                             
                         if cluster == 4 or cluster == 5:
                             corner_x = row['gt_obstacleTL_x_cm']
-                            corner_y = row['gt_obstacleTL_y_cm']
+                            corner_y = row['gt_obstacleTL_y_cm']-2
                             degs = []
                             
                             reye_degs = []
@@ -1203,7 +1203,7 @@ def zero_out_angle(df):
 
             ts_zero = ts_angle_array[np.nanargmin(np.abs(ts_angle_array - 0))]
             ts_zero_ind = np.where(ts_angle_array == ts_zero)[0][0]
-            ts_angle_array[ts_zero_ind:] = 0 
+            ts_angle_array[ts_zero_ind:] = ts_zero 
 
 
             #df.at[ind,'zero_out_angle_to_corner'] = angle_array.astype(object)
@@ -1214,21 +1214,20 @@ def zero_out_angle(df):
 
 def zero_out_angle_target_port(df):
     for ind, row in df.iterrows():
-        #angle_array = copy.deepcopy(row['angle_to_target_port'])
-        ts_angle_array = copy.deepcopy(row['ts_angle_to_target_port'])
+        #angle_array = copy.deepcopy(row['angle_to_corner'])
+        ts_angle_array = copy.deepcopy(row['ts_angle_to_corner'])
         try:
-            #zero = angle_array[np.nanargmax(np.abs(angle_array - 0))]
+            #zero = angle_array[np.nanargmin(np.abs(angle_array - 0))]
             #zero_ind = np.where(angle_array == zero)[0][0]
-
             #angle_array[zero_ind:] = 0 
 
-            ts_zero = ts_angle_array[np.nanargmax(np.abs(ts_angle_array - 0))]
+            ts_zero = ts_angle_array[np.nanargmin(np.abs(ts_angle_array - 0))]
             ts_zero_ind = np.where(ts_angle_array == ts_zero)[0][0]
-            
-
             ts_angle_array[ts_zero_ind:] = 0 
-            #df.at[ind,'zero_out_angle_to_target_port'] = angle_array.astype(object)
-            df.at[ind,'ts_zero_out_angle_to_target_port'] = ts_angle_array.astype(object)
+
+
+            #df.at[ind,'zero_out_angle_to_corner'] = angle_array.astype(object)
+            df.at[ind,'ts_zero_out_angle_to_corner'] = ts_angle_array.astype(object)
         except:
             continue
 
@@ -1771,11 +1770,17 @@ def turn_direction(df):
     for ind,row in df.iterrows():
         peaks, _ = find_peaks(np.abs(row.head_angle_velocity), height=(1,10))
         head_direction = row.head_angle_velocity[peaks[0]]
+        head_direction_end = row.head_angle_velocity[peaks[-1]]
         
         if head_direction < 0:
             df.at[ind,'turn_direction'] = 'up'
         elif head_direction> 0:
             df.at[ind,'turn_direction'] = 'down'
+
+        if head_direction_end < 0:
+            df.at[ind,'turn_direction_end'] = 'up'
+        elif head_direction_end> 0:
+            df.at[ind,'turn_direction_end'] = 'down'
 
 
 def turn_to_obstacle(df):
@@ -1926,15 +1931,69 @@ def check_trial_for_obstalce_cross_df(df):
 def angular_velocity_head_corner(df):
     for ind,row in df.iterrows():
         #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
-        trace = gaussian_filter(np.array((row.ts_zero_out_angle_to_corner.astype(float))),3,mode = 'reflect').astype(object)
+        trace = gaussian_filter(np.array((row.ts_angle_to_corner.astype(float))),3,mode = 'reflect').astype(object)
         
         df.at[ind,'head_corner_angle_velocity'] = calculate_angular_velocity(trace.astype(float),60).astype(object)
+
+
+def avg_lateral_error(df):
+    for ind,row in df.iterrows():
+        if type(row.lateral_error)==float:
+            df.at[ind,'avg_lateral_error'] = np.nan
+        else:
+            df.at[ind,'avg_lateral_error'] = np.nanmean(row.lateral_error[:int(row.obstacle_ind)])
+def avg_lateral_error_thresh(df,thresh = 5):
+    for ind,row in df.iterrows():
+        if type(row.lateral_error)==float:
+            df.at[ind,'avg_lateral_error_thresh'+ '_' + str(thresh)] = np.nan
+        else:
+            first_dist_start,first_dist_end = np.where((row.ts_distance_from_edge>=0)&(row.ts_distance_from_edge<=thresh))[0][0],np.where((row.ts_distance_from_edge>=0)&(row.ts_distance_from_edge<=thresh))[0][-1]
+            df.at[ind,'avg_lateral_error_thresh'+ '_' + str(thresh)] = np.nanmean(row.lateral_error[int(first_dist_start):int(row.first_dist_end)])
+
 def distance_at_head_turn(df):
     for ind,row in df.iterrows():
-        thresh = row.head_corner_angle_velocity[:int(row.obstacle_ind)].argmin()
-        df.at[ind,'distance_at_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][thresh]
+        peaks, prop = find_peaks(np.abs(row.head_angle_velocity[:int(row.obstacle_ind)]), width=2,height=(3,12),distance=10)
+        if len(peaks) == 0:
+            df.at[ind,'distance_at_head_turn'] = np.nan
+            df.at[ind,'distance_at_head_turn_index'] = np.nan
+            df.at[ind,'distance_at_head_turn_indexs'] = np.nan
+            df.at[ind,'angle_at_head_turn'] = np.nan
+            df.at[ind,'num_turn'] = 0
+        else:
+            max_peak = peaks[prop['peak_heights'].argmax()]
+            end_movement = prop['right_bases'][prop['peak_heights'].argmax()]
+            start_movement = prop['left_bases'][prop['peak_heights'].argmax()]
+  
+            df.at[ind,'distance_at_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][max_peak]
+            df.at[ind,'distance_after_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][end_movement]
+            df.at[ind,'distance_before_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][start_movement]
+            df.at[ind,'indexs_of_head_turn'] = np.asarray([start_movement,max_peak,end_movement]).astype(object)
+            df.at[ind,'distance_at_head_turn_indexs'] = np.array(peaks).astype(object)
+            df.at[ind,'angle_at_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][max_peak]
+            df.at[ind,'angle_after_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][end_movement]
+            df.at[ind,'angle_before_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][start_movement]
+            df.at[ind,'num_turn'] = len(peaks)        
 
-        
+
+def intial_distance_to_obstacle(df):
+    for ind,row in df.iterrows():
+        df.at[ind,'intial_distance'] = np.round(row.ts_distance_from_edge[0])
+
+
+
+def last_occurrence_indices(arr):
+    # Reverse the array to find the last occurrence by position
+    _, inverse_indices = np.unique(arr[::-1], return_inverse=True)
+    
+    # Calculate last occurrence indices
+    last_indices = len(arr) - 1 - np.unique(inverse_indices, return_index=True)[1]
+    
+    # Sort to preserve order of appearance in the original array
+    return np.sort(last_indices)
+
+# Example usage
+arr = np.array([4, 2, 3, 2, 4, 5, 3, 6])
+result = last_occurrence_indices(arr)
 
 
 

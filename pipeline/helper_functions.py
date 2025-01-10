@@ -354,6 +354,28 @@ def create_color_dict(df,key,color_pallete,sort =False):
         color_map = dict(zip(color_labels, rgb_values))
     return color_map
 
-def smooth(points,sigma = 3):
+def smooth(points,sigma = 1):
     filtered = gaussian_filter(points.astype(float),sigma = sigma)
     return filtered
+
+def create_monotonic_array(size, zero_index):
+    # Create an array of range values that monotonically increases
+    array = np.arange(size)
+    
+    # Subtract the value at zero_index from all elements to make that index zero
+    array = array - array[zero_index]
+    
+    return array
+
+def correct_trace(row,ob_x,ob_y):
+    input_ob_x, input_ob_y = row.gt_obstacleTL_x_cm ,row.gt_obstacleTL_y_cm
+    direction = row.odd
+    diff_x = input_ob_x - ob_x[0]
+    diff_y = input_ob_y- ob_y[0]
+    correct_y = 1*(diff_y)
+    if direction == 'right':
+        correct_x = -1*(diff_x)
+
+    else:
+        correct_x = diff_x
+    return smooth(row.ts_nose_x_cm - diff_x) , smooth(row.ts_nose_y_cm- diff_y) 

@@ -430,7 +430,9 @@ class AvoidanceSession(BaseInput):
 
        
         ## convert pxl to cm 
-        dist_to_posts = np.nanmedian(self.data['arenaTR_x'].iloc[0],0) - np.nanmedian(self.data['arenaTL_x'].iloc[0],0)
+        right = np.nanmedian([np.nanmedian(self.data['arenaTR_x'].iloc[0],0) ,np.nanmedian(self.data['arenaBR_x'].iloc[0],0) ])
+        left = np.nanmedian([np.nanmedian(self.data['arenaTL_x'].iloc[0],0) ,np.nanmedian(self.data['arenaBL_x'].iloc[0],0) ])
+        dist_to_posts = np.nanmedian([right - left],0)
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
@@ -547,6 +549,7 @@ class AvoidanceSession(BaseInput):
             self.data.at[ind,'gt_obstacle_cen_y' ] = np.mean(yvals)
             self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.mean(yvals_cm)
         print('ob_cen')
+        self.data.to_hdf(os.path.join(self.session_path, ('test1_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         start(self.data)
         print('start')
@@ -591,5 +594,6 @@ class AvoidanceSession(BaseInput):
         self.raw_data =  self.data
         self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('saving' + self.session_name + ' processed')
+        print(self.session_path)
         self.processed_data.to_hdf(os.path.join(self.session_path,('processed_' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
       
