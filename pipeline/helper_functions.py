@@ -379,3 +379,21 @@ def correct_trace(row,ob_x,ob_y):
     else:
         correct_x = diff_x
     return smooth(row.ts_nose_x_cm - diff_x) , smooth(row.ts_nose_y_cm- diff_y) 
+
+def correct_trace_whole_trial(row,ob_x,ob_y):
+    input_ob_x, input_ob_y = row.gt_obstacleTL_x_cm ,row.gt_obstacleTL_y_cm
+    direction = row.odd
+    diff_x = input_ob_x - ob_x[0]
+    diff_y = input_ob_y- ob_y[0]
+    correct_y = 1*(diff_y)
+    if direction == 'right':
+        correct_x = -1*(diff_x)
+
+    else:
+        correct_x = diff_x
+    return smooth(row.nose_x_cm - diff_x) , smooth(row.nose_y_cm- diff_y) 
+
+def find_closest_numpy(target, values):
+    values_array  =values
+    index = np.argmin(np.abs(values_array - target))
+    return index

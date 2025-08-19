@@ -13,7 +13,8 @@ from sklearn.cluster import KMeans
 import matplotlib.colors as mcolors
 import glob
 import h5py
-from astropy.convolution import interpolate_replace_nans
+import subprocess
+
 from scipy.ndimage import gaussian_filter1d
 
 
@@ -25,10 +26,12 @@ warnings.filterwarnings('ignore')
 
 from src.base import BaseInput
 from src.topcam import Topcam
-from src.utils.auxiliary import flatten_series, find_index_in_list
+from src.utils.auxiliary import find_index_in_list,flatten_series
 from src.utils.path import find
-from utils.base_functions import *
-from plots.plots import plot_oa
+#from utils.base_functions import *
+from pipeline.helper_functions import list_columns,interpolate_array,flatten_list_of_arrays
+from pipeline.oa_calculations import distance_calcs,heading_calcs,cluster_obstacle,deveation,lateral_error,df_tortuosity,head_angle_velocity,start
+#from plots.plots import plot_oa
 
 
 ## create avoidance session object 
@@ -55,7 +58,7 @@ class AvoidanceProcessing(BaseInput):
         elif self.is_non_obstacle:
             self.dlc_project = {'light':'/home/niell_lab/Documents/deeplabcut_projects/object_avoidance-Mike-2021-08-31/config.yaml',
                                 'dark':None}
-        self.camname = 'top1'
+        self.camname = 'TOP1'
         self.generic_camconfig = {
             'paths': {
                 'dlc_projects': {
@@ -77,10 +80,10 @@ class AvoidanceProcessing(BaseInput):
                     'task': [],             
                     'poke1_ts':[],
                     'poke2_ts': [],
-                    'top1_ts': [],
+                    'TOP1_ts': [],
                     'poke1_t0':[],
                     'poke2_t0': [],
-                    'top1_t0': [],
+                    'TOP1_t0': [],
                     'condition':[]}
         # list of dates for analysis
         data_path = Path(self.path).expanduser()
@@ -91,6 +94,9 @@ class AvoidanceProcessing(BaseInput):
                 for task in os.listdir(data_path / date / ani):
                     data_paths = [str(i) for i in list((data_path / date / ani/ task).rglob('*.csv'))]
                     data_paths = [i for i in data_paths if 'spout' not in i]
+                    data_paths = [i for i in data_paths if 'REYE' not in i]
+                    data_paths = [i for i in data_paths if 'Ephys' not in i]
+                    data_paths = [i for i in data_paths if 'WORLD' not in i]
                     if data_paths != []:
                         _, name = os.path.split(data_paths[1])
                         split_name = name.split('_')
@@ -104,9 +110,9 @@ class AvoidanceProcessing(BaseInput):
                         time = self.read_timestamp_file()
                         _, name = os.path.split(data_paths[ind])
                         split_name = name.split('_')
-                        data_dict[split_name[5] +'_ts'].append(time)
-                        data_dict[split_name[5] +'_t0'].append(time[0])
-        
+                        data_dict[split_name[6] +'_ts'].append(time)
+                        data_dict[split_name[6] +'_t0'].append(time[0])
+        print('gather_all_sessions')
         self.all_sessions = pd.DataFrame.from_dict(data_dict)
 ## DLC        
     def change_dlc_project(self, project_paths):
@@ -153,16 +159,20 @@ class AvoidanceProcessing(BaseInput):
             #print(trial_row)
             try:
                 # analyze each trial
-                trial = AvoidanceSession(trial_row, self.path, self.metadata,self.tasktype)
+                #print(trial_row)
+                trial = AvoidanceSession(s_input= trial_row, path_input=self.path, metadata_input=self.metadata,task=self.tasktype)
+                print('trial')
 
             
                 dlc_h5 = find('*'+str(trial_row['date'])+'*'+str(trial_row['animal'])+'*'+str(trial_row['task'])+'*.h5', self.path)
-                
+                dlc_h5 = [i for i in dlc_h5 if 'REYE' not in i]
+                #print(dlc_h5)
                 if dlc_h5 == []:
                     continue
                 trial_path, _ = os.path.split(dlc_h5[0])
                 trial_path = trial_path.replace(os.sep, '/')
                 trial_name = '_'.join(os.path.splitext(os.path.split([i for i in find('*.avi', trial_path) if all(bad not in i for bad in ['plot','IR','rep11','betafpv','side_gaze','._'])][0])[1])[0].split('_')[:-1])
+                print(trial_name)
                 trial.add_tracking(trial_name, trial_path)
                 if self.is_pillar_avoidance:
                     trial.pillar_avoidance()
@@ -182,19 +192,20 @@ class AvoidanceSession(BaseInput):
         self.s = s_input # series from dataframe of all trials
         self.tasktype = task
         self.likelihood_thresh = 0.75
-        self.dist_across_arena = 48.26 # cm between bottom-right and bottom-left pillar
+        self.dist_across_arena = 60.96 # cm between bottom-right and bottom-left pillar new rig is 24 in long
         self.path = path_input
-        self.camname = 'top1'
+        self.camname = 'TOP1'
         self.shared_metadata = metadata_input
 
         #self.num_clusters_to_use = self.shared_metadata[self.s['date']][self.s['animal']][str(self.s['task'])]['num_positions']
         self.session_path = os.path.join(*[self.path, str(self.s['date']), str(self.s['animal']),str(self.s['task'])])
-        self.vidpath = find('*'+str(self.s['date'])+'*'+self.s['animal']+'*'+str(self.s['task'])+'*.avi', self.session_path)[0]
+        #self.vidpath = find('*'+str(self.s['date'])+'*'+self.s['animal']+'*'+str(self.s['task'])+'*.avi', self.session_path)[0]
 
         self.generic_camconfig = {
             'internals': {
                 'follow_strict_naming': False,
-                'likelihood_threshold': 0.75
+                'likelihood_threshold': 0.75,
+                'multianimal_top_project':False
             }
         }
     
@@ -210,14 +221,14 @@ class AvoidanceSession(BaseInput):
             count += 1
             df1.at[count, 'first_poke'] = self.s['poke1_ts'][c]
             df1.at[count, 'second_poke'] = self.s['poke2_ts'][c]
-            time = self.s['top1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
-            vidframes = np.array(list(find_index_in_list(list(self.s['top1_ts']), list(time))))
+            time = self.s['TOP1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
+            vidframes = np.array(list(find_index_in_list(list(self.s['TOP1_ts']), list(time))))
             if len(vidframes) == 0:
                 df1.drop(count)
                 continue 
             df1.at[count, 'trial_timestamps'] = time.astype(object)
             df1.at[count, 'trial_vidframes'] = vidframes[0].astype(object)
-            start_stop_inds = (int(np.where([self.s['top1_ts']==time[0]])[1]), int(np.where([self.s['top1_ts']==time[-1]])[1]))
+            start_stop_inds = (int(np.where([self.s['TOP1_ts']==time[0]])[1]), int(np.where([self.s['TOP1_ts']==time[-1]])[1]))
             for pos in list(self.positions['point_loc'].values):
                 df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
             df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
@@ -227,14 +238,14 @@ class AvoidanceSession(BaseInput):
             if c+1 < len(self.s['poke1_ts']):
                 df1.at[count, 'first_poke'] = self.s['poke2_ts'][c]
                 df1.at[count, 'second_poke'] = self.s['poke1_ts'][c+1]
-                time = self.s['top1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
-                vidframes = np.array(list(find_index_in_list(list(self.s['top1_ts']), list(time))))
+                time = self.s['TOP1_ts']; time = time[time > df1.loc[count,'first_poke']]; time = time[time < df1.loc[count,'second_poke']]
+                vidframes = np.array(list(find_index_in_list(list(self.s['TOP1_ts']), list(time))))
                 if len(vidframes) == 0:
                     df1.drop(count)
                     continue 
                 df1.at[count, 'trial_timestamps'] = time.astype(object)
                 df1.at[count, 'trial_vidframes'] = vidframes.astype(object)
-                start_stop_inds = (int(np.where([self.s['top1_ts']==time[0]])[1]), int(np.where([self.s['top1_ts']==time[-1]])[1]))
+                start_stop_inds = (int(np.where([self.s['TOP1_ts']==time[0]])[1]), int(np.where([self.s['TOP1_ts']==time[-1]])[1]))
                 for pos in list(self.positions['point_loc'].values):
                     df1.at[count, pos] = np.array(self.positions.loc[start_stop_inds[0]:start_stop_inds[1], pos]).astype(object)
                 df1.at[count, 'len'] = start_stop_inds[1] - start_stop_inds[0]
@@ -247,7 +258,7 @@ class AvoidanceSession(BaseInput):
         print('df made')
         
         self.data = df1
-        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         
 
@@ -278,14 +289,67 @@ class AvoidanceSession(BaseInput):
         
     def add_tracking(self, name, path):
         tc = Topcam(self.generic_camconfig, name, path, self.camname)
+        print('gather camera files')
+        #print(self.camname)
         tc.gather_camera_files()
+        print('pack_position_data')
         tc.pack_position_data()
+        print('filter_likelihood')
         tc.filter_likelihood()
         #tc.pack_video_frames()
         self.positions = tc.xrpts
         #self.frames = tc.xrframes
         self.session_name = name
         self.session_path = path
+    def deinterlace(vidfile, savepath, exp_fps=30, quiet=True):
+        """ Deinterlace a video.
+
+        Parameters
+        ----------
+        path : str
+            Path to the video file.
+        savepath : str
+            Path to save the new video file. Default is None.
+        rotate : bool
+            Whether to rotate the video 180 degrees. Default is True.
+        exp_fps : int
+            Expected frame rate of the video. If the video matches
+            this frame rate (in Hz), it will be deinterlaced. Otherwise,
+            it will be skipped. Default is 30 Hz.
+        quiet : bool
+            Whether to suppress the output from ffmpeg. Default is True.
+
+        Returns
+        -------
+        savepath : str
+            Path to the new video file.
+
+        """
+
+        # Open video, get frame count and rate
+        cap = cv2.VideoCapture(vidfile)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        # Skip this video if it doesn't match the expected frame rate.
+        if fps != exp_fps:
+            return
+
+        # Create the FFMPEG commands for video rotation.
+        vf_val = 'yadif=1:-1:0, vflip, hflip, scale=640:480'
+
+        # Create the full FFMPEG command
+        cmd = ['ffmpeg', '-i', vidfile, '-vf', vf_val, '-c:v', 'libx264',
+              '-preset', 'slow', '-crf', '19', '-c:a', 'aac', '-b:a',
+              '256k', '-y', savepath]
+
+        # Set the log level
+        if quiet is True:
+            cmd.extend(['-loglevel', 'quiet'])
+
+        # Run the FFMPEG command.
+        subprocess.call(cmd)
+
+        return savepath
 
     def convert_pxls_to_dist(self):
         x_cols = [i for i in self.data.columns.values if '_x' in i]
@@ -315,7 +379,7 @@ class AvoidanceSession(BaseInput):
         print(self.tasktype) 
         self.make_task_df()
         self.data = self.data[self.data['trial_vidframes'].notna()]
-        dist_to_posts = np.median(self.data['arenaTR_x'].iloc[0],0) - np.median(self.data['arenaTL_x'].iloc[0],0)
+        dist_to_posts = np.nanmedian(self.data['arenaTR_x'].iloc[0],0) - np.nanmedian(self.data['arenaTL_x'].iloc[0],0)
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
         print('pxl')
@@ -347,33 +411,6 @@ class AvoidanceSession(BaseInput):
            
         print('mean')
         self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        #keys = ['nose','leftear','rightear','spine','midspine','tailbase']
-        #keys_list = list_columns(self.data,keys)
-        #keys_list= [col for col in keys_list if 'likelihood' not in col]
-        #keys_list= [col for col in keys_list if 'lind' not in col]
- #
-        ## check if odd or even trial
-        ##  get first index when nose crosses a distance thresh hold
-        ##trail start = ts
-        ###odd tiral at 16 cm even at 56 cm     
-        #for ind, row in self.data.iterrows(): 
-        #    """interpolate and smooth key points
-        #        interpolate across nans 
-        #        gausian smooth sigma 3 """
-        #    if row['odd'] == 'left':
-        #        nose_list = row['nose_x_cm'] 
-        #        odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5))
-        #        for key in keys_list:
-        #            self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
-        #        #use odd_ind to index into obstacle 
-        #        # iterate over columns list  
-#
-        #        #create gt_obstacle points
-        #    else: 
-        #        nose_list = row['nose_x_cm']
-        #        even_ind = np.argmax(nose_list<(self.data.rightportT_x_cm.unique()-5))
-        #        for key in keys_list:
-        #            self.data.at[ind,'ts_' + key] = row[key][even_ind:]
         keys = ['nose','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
@@ -408,40 +445,13 @@ class AvoidanceSession(BaseInput):
             dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
             self.data.at[ind,'dist'] = dist
         print('dist')
-        #self.data.to_hdf(os.path.join(self.session_path,('test' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        for ind,row in self.data.iterrows():
-            angle_to_rightport = []
-            angle_to_leftport = []
-            rightport = [row['rightportT_x_cm'],row['rightportT_y_cm']]
-            leftport = [row['leftportT_x_cm'],row['leftportT_y_cm']]
-            for indx in range(len(row['ts_nose_x_cm'])):
-                center = [np.mean([row['ts_rightear_x_cm'][indx],row['ts_leftear_x_cm'][indx]]),np.mean([row['ts_rightear_y_cm'][indx],row['ts_leftear_y_cm'][indx]])]
-                nose_points = [row['ts_nose_x_cm'][indx],row['ts_nose_y_cm'][indx]]
-                angleright = calculate_angle(center, nose_points, rightport)
-                angleleft = calculate_angle(center, nose_points, leftport)
-                angle_to_rightport.append(angleright)
-                angle_to_leftport.append(angleleft)
-            self.data.at[ind,'angle_to_rightport'] = np.array(angle_to_rightport).astype(object)
-            self.data.at[ind,'angle_to_leftport'] = np.array(angle_to_leftport).astype(object)
 
-        right_left = ['angle_to_leftport','angle_to_rightport','ts_nose_x_cm','ts_nose_y_cm']
-        for ind,row in self.data.iterrows():
-            for direction in right_left:
-                interp = pd.Series(row[direction].astype(float)).interpolate().values
-                resample = signal.resample(interp[~np.isnan(interp)],200)
-                self.data.at[ind,'resample_'+ direction] = resample.astype(object)
-        print('angle_to_port')
         
 
         
 
         self.data['time'] = self.data['len']/60
-        self.data.to_hdf(os.path.join(self.session_path,('non_obstacle' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
-        session = plot_oa('empty',self.data)
-        session.train_day_summary()
-        #train_day_summary_df(self.data)
-        print('summary_plot')
-
+       
 
         self.data.to_hdf(os.path.join(self.session_path,('non_obstacle' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('saved_df')
@@ -450,46 +460,86 @@ class AvoidanceSession(BaseInput):
 
     def pillar_avoidance(self):
         self.make_task_df()
-       
+      
         self.data = self.data[self.data['trial_vidframes'].notna()]
         
 
        
         ## convert pxl to cm 
-        dist_to_posts = np.nanmedian(self.data['arenaTR_x'].iloc[0],0) - np.nanmedian(self.data['arenaTL_x'].iloc[0],0)
+        right = np.nanmedian([np.nanmedian(self.data['arenaTR_T_x'].iloc[0],0) ,np.nanmedian(self.data['arenaBR_T_x'].iloc[0],0) ])
+        left = np.nanmedian([np.nanmedian(self.data['arenaTL_T_x'].iloc[0],0) ,np.nanmedian(self.data['arenaBL_T_x'].iloc[0],0) ])
+        dist_to_posts = np.nanmedian([right - left],0)
         self.pxls2cm = dist_to_posts/self.dist_across_arena
         self.convert_pxls_to_dist()
+        self.data.to_hdf(os.path.join(self.session_path, ('pxl_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('pxl')
-        
-  
 
-        # label odd/even trials (i.e. moving leftwards or moving rightwards?)
+        ## the median postition of arena,port,spout
+        columns_list  = [col for col in self.data.columns.tolist()if 'likelihood' not in col]
+        arena_list = [col for col in columns_list if 'arena' in col]
+
+        for item in arena_list:
+            self.data[item] = np.nanmedian(flatten_list_of_arrays(self.data[item].to_list()),0)
+
+        port_list = [col for col in columns_list if 'port' in col]
+        for item in port_list:
+            self.data[item] = np.nanmedian(flatten_list_of_arrays(self.data[item].to_list()),0)
+
+        spout_list = [col for col in columns_list if 'spout' in col]
+        for item in spout_list:
+            self.data[item] = np.nanmedian(flatten_list_of_arrays(self.data[item].to_list()),0)
+        print('median postition of arena,port,spout')
+
+        ## get center of port and spout
+        # Define all column groups
+        port_groups = {
+            'leftportT': ['leftportT_1', 'leftportT_2', 'leftportT_3', 'leftportT_4'],
+            'leftportB': ['leftportB_1', 'leftportB_2', 'leftportB_3', 'leftportB_4'],
+            'rightportT': ['rightportT_1', 'rightportT_2', 'rightportT_3', 'rightportT_4'],
+            'rightportB': ['rightportB_1', 'rightportB_2', 'rightportB_3', 'rightportB_4'],
+            'rightspout': ['rightspout_1', 'rightspout_2', 'rightspout_3', 'rightspout_4'],
+            'leftspout': ['leftspout_1', 'leftspout_2', 'leftspout_3', 'leftspout_4']
+        }
+
+        # Calculate means for each port group
+        for port, prefixes in port_groups.items():
+            x_cols = [f'{prefix}_x_cm' for prefix in prefixes]
+            y_cols = [f'{prefix}_y_cm' for prefix in prefixes]
+
+            # Convert to float and calculate means
+            self.data[x_cols] = self.data[x_cols].astype(float)
+            self.data[y_cols] = self.data[y_cols].astype(float)
+
+            self.data[f'{port}_x_cm'] = self.data[x_cols].mean(axis=1, skipna=True)
+            self.data[f'{port}_y_cm'] = self.data[y_cols].mean(axis=1, skipna=True)
+        print('center of port and spout')
+
+        # calculate head cen
+        for ind,row in self.data.iterrows():
+            head_cen_x = np.nanmedian([row.led_x_cm.astype(float),row.camera_1_x_cm.astype(float),
+                                       row.camera_2_x_cm.astype(float),row.camera_3_x_cm.astype(float)],0) 
+            head_cen_y = np.nanmedian([row.led_y_cm.astype(float),row.camera_1_y_cm.astype(float),
+                                       row.camera_2_y_cm.astype(float),row.camera_3_y_cm.astype(float)],0) 
+            self.data.at[ind,'head_cen_x_cm'] = head_cen_x.astype(object)
+            self.data.at[ind,'head_cen_y_cm'] = head_cen_y.astype(object)
+        print('head center')
+    
     
         for ind,row in self.data.iterrows():
-            nose_points = row['nose_x_cm'].astype(float)
+            nose_points = row['head_cen_x_cm'].astype(float)
             nose_points = nose_points[~np.isnan(nose_points)]
+
             if np.nanmean(nose_points[:10])<= 20:
                 self.data.at[ind,'odd'] = 'left'
             elif np.nanmean(nose_points[:10]) >=20:
                 self.data.at[ind,'odd'] = 'right'
         print('odd_even')
-        self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        self.data.to_hdf(os.path.join(self.session_path, ('odd_even_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
 
         
 
       
 
-      ## mean port and arena
-        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT']) ## add left right port B and
-        port_arena_list = [i for i in port_arena_list if 'cm' in i]
-        for pos in port_arena_list:
-           for ind,row in self.data.iterrows():
-                self.data.at[ind,pos] = np.mean(row[pos])
-
-        port_arena_list = list_columns(self.data,['arena','leftportT','rightportT'])
-        port_arena_list = [i for i in port_arena_list if 'cm' in i]
-        for pos in port_arena_list:
-            self.data[pos] = np.mean(self.data[pos])
            
 
 
@@ -497,7 +547,7 @@ class AvoidanceSession(BaseInput):
         ## get index of obstacle,bodyparts after mouse reaches a ceartin x postion Trial start
 
         # get list of columns need for re indexing
-        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        keys = ['head_cen','leftear','rightear','spine','midspine','tailbase','trial_timestamps','trial_vidframes']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
         keys_list= [col for col in keys_list if 'lind' not in col]
@@ -507,26 +557,35 @@ class AvoidanceSession(BaseInput):
         #trail start = ts
         ##odd tiral at 16 cm even at 56 cm     
         for ind, row in self.data.iterrows(): 
-            """interpolate and smooth key points
-                interpolate across nans 
-                gausian smooth sigma 3 """
             if row['odd'] == 'left':
-                nose_list = row['nose_x_cm'] 
-                odd_ind = np.argmax(nose_list>(self.data.leftportT_x_cm.unique()+5))
+                nose_list = row['head_cen_x_cm'] 
+                odd_ind = np.argmax(nose_list>(self.data.leftspout_x_cm.unique()+5))
                 for key in keys_list:
-                    self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
+                    if len(row[key].shape)==2:
+                        self.data.at[ind,'ts_' + key] = row[key][0][odd_ind:]
+                    else:
+
+
+                        
+                        self.data.at[ind,'ts_' + key] = row[key][odd_ind:]
+
+            
                 #use odd_ind to index into obstacle 
                 # iterate over columns list  
 
                 #create gt_obstacle points
             else: 
-                nose_list = row['nose_x_cm']
-                even_ind = np.argmax(nose_list<(self.data.rightportT_x_cm.unique()-5))
+                nose_list = row['head_cen_x_cm']
+                even_ind = np.argmax(nose_list<(self.data.rightspout_x_cm.unique()-5))
                 for key in keys_list:
-                    self.data.at[ind,'ts_' + key] = row[key][even_ind:]
+                    if len(row[key].shape)==2:
+                        self.data.at[ind,'ts_' + key] = row[key][0][even_ind:]
+                    else:
+                        self.data.at[ind,'ts_' + key] = row[key][even_ind:]
+                   
         print('trial_start')
 
-        keys = ['nose','leftear','rightear','spine','midspine','tailbase']
+        keys = ['head_cen','leftear','rightear','spine','midspine','tailbase']
         keys_list = list_columns(self.data,keys)
         keys_list= [col for col in keys_list if 'likelihood' not in col]
         keys_list= [col for col in keys_list if 'ts_'  in col]
@@ -541,9 +600,9 @@ class AvoidanceSession(BaseInput):
         print('smooth_ts')
 
         for ind,row in self.data.iterrows(): 
-            dist = np.nansum(np.abs(np.diff(row['ts_nose_x_cm'])))
+            dist = np.nansum(np.abs(np.diff(row['ts_head_cen_x_cm'])))
             self.data.at[ind,'dist'] = dist
-        self.data = self.data.loc[self.data['dist']<80]
+        #self.data = self.data.loc[self.data['dist']<80]
         print('dist')
         
         #self.data.to_hdf(os.path.join(self.session_path, ('test1_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
@@ -553,13 +612,13 @@ class AvoidanceSession(BaseInput):
         obstacle_cols = [col for col in obstacle_cols if 'likelihood' not in col]
 
         for ind, row in self.data.iterrows():
-            nose_list = row['nose_x_cm']
+            nose_list = row['head_cen_x_cm']
             middle_time = np.where((nose_list > 25) & (nose_list < 50))
             if len(middle_time[0]) == 0:
                 self.data = self.data.drop(ind)
             else:
                 first,last = [middle_time[0][i] for i in (0, -1)] 
-                # calculate median of each corner
+               
                 for col in obstacle_cols:
                     trace = row[col][first:last]
                     #trace = trace.astype('float')
@@ -578,31 +637,52 @@ class AvoidanceSession(BaseInput):
             self.data.at[ind,'gt_obstacle_cen_y' ] = np.mean(yvals)
             self.data.at[ind,'gt_obstacle_cen_y_cm' ] = np.mean(yvals_cm)
         print('ob_cen')
+        self.data.to_hdf(os.path.join(self.session_path, ('test1_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
+        #start(self.data)
+        #print('start')
+        ## distance calcs 
+        #distance_calcs(self.data)
+        #print('distance')
+        #self.data.to_hdf(os.path.join(self.session_path, ('test1_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        
+    
+        self.data = cluster_obstacle(self.data,3)
+        print('cluster')
+        self.data.to_hdf(os.path.join(self.session_path, ('cluster_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+        #self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+
+        #heading_calcs(self.data)
+        #print('heading')
+
+        #deveation(self.data)
+        #print('deveation')
+
+        lateral_error(self.data)
+        print('lateral_error')
+
+        df_tortuosity(self.data)
+        print('tortuosity')
+
+        head_angle_velocity(self.data)
+        print('head_angle_velocity')
+
+
+
         self.data.to_hdf(os.path.join(self.session_path, ('test_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         
 
 
         # drop any transits that were really slow (only drop slowest 10% of transits)
-        time_thresh = self.data['len'].quantile(0.9)
+        #time_thresh = self.data['len'].quantile(0.9)
         self.data['time'] = self.data['len']/60
-        self.data = self.data[self.data['len']<time_thresh]
-        session = plot_oa('empty',self.data)
-        session.single_day_df('obstacle',6)
-        session.plot_trace_cluster_single_animal()
-        print('cluster')
-        session.plot_single_trial()
-        print('single_trial')
-        #session.plot_consecutive_trials_singleday()
-        #print('consecutive_trials')
-        session.by_start_obstalce_average_single_day()
-        print('average_single_day')
-        session.train_day_summary()
-        self.data = session.df
-
-        self.raw_data =  self.data
+        #self.data = self.data[self.data['len']<time_thresh]
         self.processed_data =  self.data.drop(self.data.filter(regex='likelihood').columns,axis = 1)
 
         print('saving' + self.session_name + 'raw')
+        self.raw_data =  self.data
         self.raw_data.to_hdf(os.path.join(self.session_path, ('raw_'+ self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
         print('saving' + self.session_name + ' processed')
+        print(self.session_path)
         self.processed_data.to_hdf(os.path.join(self.session_path,('processed_' + self.data['animal'].iloc[0]+'_'+str(self.data['date'].iloc[0])+'_'+str(self.data['task'].iloc[0])+'.h5')), 'w')
+      

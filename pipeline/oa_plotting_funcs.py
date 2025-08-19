@@ -63,9 +63,9 @@ def plot_arena(df,axis,obstacle = False,outer = False):
 
     right_port = df[['rightportT_x_cm','rightportT_y_cm']].median().values.ravel('K')
 
-    axis.scatter(left_port[0],left_port[1],c='tab:purple',s=100,marker = 's')
+    axis.scatter(left_port[0],left_port[1],c='black',s=100,marker = 's')
     #axis.vlines(ymax=arena_y[0],ymin=arena_y[3],x=left_port[0],colors='k')
-    axis.scatter(right_port[0],right_port[1],c='tab:green',s=100,marker = 's')
+    axis.scatter(right_port[0],right_port[1],c='black',s=100,marker = 's')
    # axis.vlines(ymax=arena_y[1],ymin=arena_y[2],x=right_port[0],colors='k')
 
     if obstacle == True:
@@ -139,3 +139,5 @@ def correct_trace(row,ob_x,ob_y):
     else:
         correct_x = diff_x
     return smooth(row.ts_nose_x_cm - diff_x) , smooth(row.ts_nose_y_cm- diff_y) 
+
+

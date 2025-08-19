@@ -5,7 +5,7 @@ import numpy as np
 import itertools 
 from sklearn.cluster import KMeans
 from scipy.ndimage import gaussian_filter
-from pipeline.helper_functions import list_columns,interpolate_array,split_range_into_parts,largest_sequentially_increasing_by_one_subarray
+from pipeline.helper_functions import list_columns,interpolate_array,split_range_into_parts,largest_sequentially_increasing_by_one_subarray,find_closest_numpy
 import copy
 from scipy.signal import find_peaks
 
@@ -1383,6 +1383,24 @@ def cluster_obstacle(df,numcluster):
 
             
            #    df.at[ind,'cluster_label'] = 8
+    
+    if numcluster == 3:
+        print(numcluster)
+        df['cluster_label'] = np.nan
+        x_pos,y_pos  = np.sort(df['mean_gt_obstacle_cen_x_cm'].unique()),np.sort(df['mean_gt_obstacle_cen_y_cm'].unique())
+
+        row_1, row_2, row_3 = y_pos[0],y_pos[1],y_pos[2]
+        for clusters, cluster_name in enumerate(df['obstacle_cluster'].unique()):
+            #label cluster by obstacle post
+            x=df.loc[df['obstacle_cluster']==cluster_name]
+            for ind,row in x.iterrows():
+                closest = find_closest_numpy(row['mean_gt_obstacle_cen_y_cm'], y_pos)
+                if closest == 0:
+                    df.at[ind,'cluster_label'] = 0
+                if closest == 1:
+                    df.at[ind,'cluster_label'] = 1
+                if closest == 2:
+                    df.at[ind,'cluster_label'] = 2
     df['obstacle_cluster'] = df['cluster_label'].astype(int)
     return df
 
@@ -1660,12 +1678,41 @@ def get_head_angle(df):
                 angs.append(ang)
         df.at[ind, 'head_angle'] = gaussian_filter(np.array(np.degrees(angs)),2,mode = 'reflect').astype(object)
 
+def get_head_angle_whole_trial(df):
+    """ ego centric head angle using trial"""
+    for ind, row in df.iterrows():
+        leftear_x = row['leftear_x_cm']
+        leftear_y = row['leftear_y_cm']
+        rightear_x = row['rightear_x_cm']
+        rightear_y = row['rightear_y_cm']
+        nose_x = row['nose_x_cm']
+        nose_y = row['nose_y_cm']
+        angs = []
+        if row.odd == 'left':
+            for step in range(len(leftear_x)):
+                ang = np.arctan2(np.mean([leftear_y[step],rightear_y[step]])-nose_y[step],(np.mean([leftear_x[step],rightear_x[step]])-nose_x[step])*-1)
+                angs.append(ang)
+        else:
+            for step in range(len(leftear_x)):
+                ang = np.arctan2(np.mean([leftear_y[step],rightear_y[step]])-nose_y[step],(np.mean([leftear_x[step],rightear_x[step]])-nose_x[step]))
+                angs.append(ang)
+        df.at[ind, 'head_angle_whole_trial'] = gaussian_filter(np.array(np.degrees(angs)),2,mode = 'reflect').astype(object)
+
+
 def angular_velocity_head(df):
     for ind,row in df.iterrows():
         #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
         head_angle_velocity = calculate_angular_velocity(row.head_angle.astype(float),60).astype(object)
         df.at[ind,'head_angle_velocity'] = head_angle_velocity
         df.at[ind,'intial_head_angle_velocity'] = head_angle_velocity.astype(float)[np.isfinite(head_angle_velocity.astype(float))][0]
+
+def angular_velocity_head_whole_trial(df):
+    for ind,row in df.iterrows():
+        #filtered_head_angle = gaussian_filter(row.head_angle.astype(float),2)
+        head_angle_velocity = calculate_angular_velocity(row.head_angle.astype(float),60).astype(object)
+        df.at[ind,'head_angle_velocity_whole_trial'] = head_angle_velocity
+        
+
 
 def calculate_angular_velocity(angles, frame_rate):
     # Convert angles to radians if they are given in degrees
@@ -1787,9 +1834,9 @@ def turn_direction(df):
 def turn_direction_left_right(df):
     for ind,row in df.iterrows():
 
-        peaks, _ = find_peaks(np.abs(row.head_angle_velocity), width=2,height=(1,20),distance=10)
-        head_direction = row.head_angle_velocity[peaks[0]]
-        head_direction_end = row.head_angle_velocity[peaks[-1]]
+        peaks, _ = find_peaks(np.abs(row.head_angle_velocity_whole_trial), width=2,height=(1,20),distance=10)
+        head_direction = row.head_angle_velocity_whole_trial[peaks[0]]
+        head_direction_end = row.head_angle_velocity_whole_trial[peaks[-1]]
 
         if row.odd == 'left':
         
@@ -1805,9 +1852,16 @@ def turn_direction_left_right(df):
             elif head_direction> 0:
                 df.at[ind,'turn_direction_left_right'] = 'right'
 
+def get_initial_turn_direction(df):
+    """calculate the egocentric head angle and velocity"""
+    get_head_angle_whole_trial(df)
+    angular_velocity_head_whole_trial(df)
+    turn_direction_left_right(df)
+
            
 
 def turn_to_obstacle(df):
+    print('new2')
     for ind,row in df.iterrows():
         if (row.obstacle_cluster ==  2) or  (row.obstacle_cluster ==  3):
             if (row.start=='top') & (row.turn_direction=='up'):
@@ -1819,15 +1873,15 @@ def turn_to_obstacle(df):
             if (row.start=='bottom') & (row.turn_direction=='up'):
                 df.at[ind,'turn_to_obstacle'] = 'towards'
         elif (row.obstacle_cluster ==  0) or  (row.obstacle_cluster ==  1):
-            if row.turn_direction == 'up':
+            if (row.turn_direction =="up"):
                 df.at[ind,'turn_to_obstacle'] = 'towards'
             else:
                 df.at[ind,'turn_to_obstacle'] = 'away'
         elif (row.obstacle_cluster ==  4) or  (row.obstacle_cluster ==  5):
-            if row.turn_direction == 'up':
-                df.at[ind,'turn_to_obstacle'] = 'away'
-            else:
+            if (row.turn_direction =="down"):
                 df.at[ind,'turn_to_obstacle'] = 'towards'
+            else:
+                df.at[ind,'turn_to_obstacle'] = 'away'
 
 
 
@@ -1976,16 +2030,47 @@ def avg_lateral_error_thresh(df,thresh = 5):
 
 def distance_at_head_turn(df):
     for ind,row in df.iterrows():
-        peaks, prop = find_peaks(np.abs(row.head_angle_velocity[:int(row.obstacle_ind)]), width=2,height=(3,20),distance=10)
-        if len(peaks) == 0:
-            df.at[ind,'distance_at_head_turn'] = np.nan
-            df.at[ind,'distance_at_head_turn_index'] = np.nan
-            df.at[ind,'distance_at_head_turn_indexs'] = np.nan
-            df.at[ind,'angle_at_head_turn'] = np.nan
-            df.at[ind,'num_turn'] = 0
-        else:
+        #peaks, prop = find_peaks(np.abs(row.head_angle_velocity[:int(row.obstacle_ind)]), width=2,height=(3,20),distance=10)
+        #peaks, prop = find_peaks(np.abs(row.head_angle_velocity[:int(row.obstacle_ind)]), height=0)
+        peaks, prop = find_peaks(np.abs(row.head_angle_velocity[:int(row.obstacle_ind)]), width=0,height=(0,20))
+    
+        
+        if len(peaks) == 1:
             max_peak = peaks[prop['peak_heights'].argmax()]
             max_vel = prop['peak_heights'].max()
+            max_ind = prop['peak_heights'].argmax()
+            head_turn_velocities = prop['peak_heights']*60
+            end_movement = int(np.round(prop['right_ips'][prop['peak_heights'].argmax()]))
+            start_movement = int(np.round(prop['left_ips'][prop['peak_heights'].argmax()]))
+            df.at[ind,'distance_at_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][max_peak]
+            df.at[ind,'distance_after_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][end_movement]
+            df.at[ind,'distance_before_head_turn'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][start_movement]
+            df.at[ind,'indexs_of_head_turn'] = np.asarray([start_movement,max_peak,end_movement]).astype(object)
+            df.at[ind,'head_turn_indexs'] = np.array(peaks).astype(object)
+            df.at[ind,'before_head_turn_indexs'] = np.round(prop['left_ips']).astype(int).astype(object)
+            df.at[ind,'after_head_turn_indexs'] = np.round(prop['right_ips']).astype(int).astype(object)
+            df.at[ind,'angle_at_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][max_peak]
+            df.at[ind,'angle_after_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][end_movement]
+            df.at[ind,'angle_before_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][start_movement]
+            df.at[ind,'num_turn'] = len(peaks)
+            df.at[ind,'head_turn_velocity'] = max_vel
+            df.at[ind,'head_turn_velocities'] = head_turn_velocities.astype(object)
+            df.at[ind,'angles_at_head_turns'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][max_peak]
+            df.at[ind,'angles_at_head_turns_ends'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][end_movement]
+            df.at[ind,'distances_at_head_turns'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][max_peak]
+        if len(peaks) >1:
+            #print(peaks)
+            max_peak = peaks[prop['peak_heights'].argmax()]
+            max_vel = prop['peak_heights'].max()
+            max_ind = prop['peak_heights'].argmax()
+            head_turn_velocities = prop['peak_heights']*60
+            mask = np.ones_like(peaks, dtype=bool)
+            mask[max_ind] = False 
+            non_peak_turns_inds = peaks[mask]
+
+            #non_peak_turns = np.array(peaks)[prop['peak_heights'].argmax()]
+            #print(prop)
+            non_peak_turns_ends = np.round(prop['right_ips'][mask]).astype(int)
             end_movement = int(np.round(prop['right_ips'][prop['peak_heights'].argmax()]))
             start_movement = int(np.round(prop['left_ips'][prop['peak_heights'].argmax()]))
   
@@ -2001,6 +2086,37 @@ def distance_at_head_turn(df):
             df.at[ind,'angle_before_head_turn'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][start_movement]
             df.at[ind,'num_turn'] = len(peaks)
             df.at[ind,'head_turn_velocity'] = max_vel
+            df.at[ind,'head_turn_velocities'] = head_turn_velocities.astype(object)
+            
+            if type(row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_inds).tolist()]) == float:
+                df.at[ind,'angles_at_head_turns'] = np.asarray([row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_inds).tolist()]])
+                df.at[ind,'distances_at_head_turns'] = np.asarray([row.ts_distance_from_edge[:int(row.obstacle_ind)][np.asarray(non_peak_turns_inds).tolist()]])
+            else:
+                df.at[ind,'angles_at_head_turns'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_inds).tolist()].astype(object)
+                df.at[ind,'distances_at_head_turns'] = row.ts_distance_from_edge[:int(row.obstacle_ind)][np.asarray(non_peak_turns_inds).tolist()].astype(object)
+            if type(row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_ends).tolist()]) == float:
+                df.at[ind,'angles_at_head_turns_ends'] = np.asarray([row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_ends).tolist()]])
+            else:
+                df.at[ind,'angles_at_head_turns_ends'] = row.ts_angle_to_corner[:int(row.obstacle_ind)][np.asarray(non_peak_turns_ends).tolist()].astype(object)
+        else:
+           
+            df.at[ind,'distance_at_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'distance_after_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'distance_before_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'indexs_of_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'head_turn_indexs'] =np.asarray([np.nan])
+            df.at[ind,'before_head_turn_indexs'] = np.asarray([np.nan])
+            df.at[ind,'after_head_turn_indexs'] = np.asarray([np.nan])
+            df.at[ind,'angle_at_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'angle_after_head_turn'] =np.asarray([np.nan]) 
+            df.at[ind,'angle_before_head_turn'] = np.asarray([np.nan])
+            df.at[ind,'num_turn'] = np.asarray([np.nan])
+            df.at[ind,'head_turn_velocity'] = np.asarray([np.nan])
+            df.at[ind,'angles_at_head_turns'] = np.asarray([np.nan])
+            df.at[ind,'angles_at_head_turns_ends'] = np.asarray([np.nan])
+            df.at[ind,'distances_at_head_turns'] = np.asarray([np.nan])
+            df.at[ind,'head_turn_velocities'] = np.asarray([np.nan])
+            df.at[ind,'num_turn'] = 0
 
 def intial_distance_to_obstacle(df):
     for ind,row in df.iterrows():
@@ -2026,6 +2142,13 @@ def first_occurrence_indices(arr):
     unique_values, first_indices = np.unique(arr, return_index=True)
     sorted_indices = np.sort(first_indices)
     return sorted_indices
+
+def goal_port(df):
+    for ind,row in df.iterrows():
+        ob_ind = int(row.obstacle_ind)
+        df.at[ind,'goal_distance_from_target_port'] = row.ts_distance_from_target_port[ob_ind:].astype(object)
+        df.at[ind,'goal_angle_to_target_port'] = row.ts_angle_to_target_port[ob_ind:].astype(object)
+        df.at[ind,'goal_lateral_error_to_target_port'] = row.ts_lateral_error_to_target_port[ob_ind:].astype(object)
 
 
 

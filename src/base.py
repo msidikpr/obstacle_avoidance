@@ -448,11 +448,14 @@ class Camera(BaseInput):
                 else:
                     self.timestamp_path = None
         # all other cameras (i.e. topcam and sidecam)
-        else:
+        if self.camname.lower() == 'top1':
             avi_paths = [x for x in find(('*.avi'), self.recording_path) if x != []]
+            avi_paths = [x for x in avi_paths if 'TOP1' in x]
             self.video_path = next(path for path in avi_paths if self.camname in path and 'plot' not in path and 'speed_yaw' not in path)
             csv_paths = [x for x in find(('*BonsaiTS*.csv'), self.recording_path) if x != []]
             self.timestamp_path = next(i for i in csv_paths if self.camname in i)
+            dlc_paths = [x for x in find(('*.h5'), self.recording_path) if 'TOP1' in x]
+            #self.dlc_path = []
 
     def pack_video_frames(self, usexr=True, dwnsmpl=None):
        # if dwnsmpl is None:
@@ -494,8 +497,10 @@ class Camera(BaseInput):
         self.xrframes = formatted_frames
 
     def pack_position_data(self):
+    
         """ Pack the camera's dlc points and timestamps together in one DataArray.
         """
+       
         # check that pt_path exists
         if self.dlc_path is not None and self.dlc_path != [] and self.timestamp_path is not None:
             # open multianimal project with a different function than single animal h5 files

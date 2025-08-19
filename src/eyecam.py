@@ -887,30 +887,30 @@ class Eyecam(Camera):
                     engine='netcdf4', encoding={self.camname+'_video':{"zlib": True, "complevel": 4}})
 
     def process(self):
-        if self.config['main']['deinterlace'] and not self.config['internals']['flip_headcams']['run']:
+        if self.config['main']['deinterlace']: #and not self.config['internals']['flip_headcams']['run']:
             self.deinterlace()
-        elif not self.config['main']['deinterlace'] and self.config['internals']['flip_headcams']['run']:
-            self.flip_headcams()
-        elif self.config['main']['deinterlace'] and self.config['internals']['flip_headcams']['run']:
-            print('Config options deinterlace and flip_headcams are both True, which conflict with each other.')
-            sys.exit()
+        #elif not self.config['main']['deinterlace'] and self.config['internals']['flip_headcams']['run']:
+            #self.flip_headcams()
+        #elif self.config['main']['deinterlace'] and self.config['internals']['flip_headcams']['run']:
+            #print('Config options deinterlace and flip_headcams are both True, which conflict with each other.')
+            #sys.exit()
 
-        if self.config['internals']['apply_gamma_to_eyecam']:
-            self.auto_contrast()
+        #if self.config['internals']['apply_gamma_to_eyecam']:
+            #self.auto_contrast()
 
         if self.config['main']['pose_estimation']:
             self.pose_estimation()
 
-        if self.config['main']['parameters']:
-            self.gather_camera_files()
-            self.pack_position_data()
-            self.pack_video_frames()
-            self.get_horizontal_vertical_rotation()
-            if self.config['internals']['get_torsion_from_ridges']:
-                self.get_torsion_from_ridges()
-            if self.config['internals']['get_torsion_from_markers']:
-                print('Torsion from markers not implemented.')
-                sys.exit()
-            if self.config['internals']['diagnostic_preprocessing_videos']:
-                self.eye_diagnostic_video()
-            self.save_params()
+        #if self.config['main']['parameters']:
+        #    self.gather_camera_files()
+        #    self.pack_position_data()
+        #    self.pack_video_frames()
+        #    self.get_horizontal_vertical_rotation()
+        #    if self.config['internals']['get_torsion_from_ridges']:
+        #        self.get_torsion_from_ridges()
+        #    if self.config['internals']['get_torsion_from_markers']:
+        #        print('Torsion from markers not implemented.')
+        #        sys.exit()
+        #    if self.config['internals']['diagnostic_preprocessing_videos']:
+        #        self.eye_diagnostic_video()
+        #    self.save_params()
